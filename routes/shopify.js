@@ -131,7 +131,6 @@ router.post('/shopify/orders', (req, res) => {
 		let ordersEndpoint = `${getStoreApiURL(store)}/orders.json?created_at_min=${start}&created_at_max=${endIncremented}&financial_status=paid&status=any&limit=250`;
 
 		const fetchOrders = () => {
-			console.count("fetching...")
 			axios.get(ordersEndpoint, {
 				headers: {
 					'X-Shopify-Access-Token': decrypt(shopifyAccessToken)
