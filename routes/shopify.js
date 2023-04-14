@@ -2,7 +2,7 @@ const router = require('express').Router();
 const axios = require('axios');
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../helpers/crypto');
-const { getStoreApiURL, getMetrics } = require('../helpers/shop');
+const { getStoreApiURL, getMetrics, extractHttpsUrl } = require('../helpers/shop');
 const moment = require('moment');
 
 const localState = 'n159-uimp02430u18r4bnty3920b1y382458';
@@ -124,29 +124,39 @@ router.post('/shopify/orders', (req, res) => {
 	const shopifyAccessToken = getToken(req, 'shopify');
 	const { store, start, end, granularity } = req.body;
 
-	//frontend will set start and end to the same date for a single day of data, granularity must be 'hour'!
-	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
-
 	if (shopifyAccessToken) {
-		axios.get(`${getStoreApiURL(store)}/orders.json`, {
-			params: {
-				created_at_min: start,
-				created_at_max: endIncremented,
-				financial_status: 'paid'
-			},
-			headers: {
-				'X-Shopify-Access-Token': decrypt(shopifyAccessToken)
-			}
-		})
-			.then(response => {
-				res.status(200).json({
-					id: 'shopify.order-metrics',
-					metricsBreakdown: getMetrics(response.data.orders, granularity)
+		//frontend will set start and end to the same date for a single day of data, granularity must be 'hour'!
+		let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
+		let allOrders = [];
+		let ordersEndpoint = `${getStoreApiURL(store)}/orders.json?created_at_min=${start}&created_at_max=${endIncremented}&financial_status=paid&status=any&limit=250`;
+
+		const fetchOrders = () => {
+			console.count("fetching...")
+			axios.get(ordersEndpoint, {
+				headers: {
+					'X-Shopify-Access-Token': decrypt(shopifyAccessToken)
+				}
+			})
+				.then(response => {
+					//alguns pedidos podem ter sidos cancelados depois de pagos
+					const trueOrders = response.data.orders.filter(order => order.cancelled_at === null);
+					allOrders = allOrders.concat(trueOrders);
+					ordersEndpoint = extractHttpsUrl(response.headers.link);
+					if (ordersEndpoint) {
+						fetchOrders(); // Call the function recursively to continue fetching orders
+					} else {
+						res.status(200).json({
+							id: 'shopify.order-metrics',
+							metricsBreakdown: getMetrics(allOrders, granularity)
+						});
+					}
+				})
+				.catch(error => {
+					console.log(error.data);
 				});
-			})
-			.catch(error => {
-				console.log(error);
-			})
+		}
+
+		fetchOrders();
 	}
 });
 
