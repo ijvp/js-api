@@ -39,7 +39,6 @@ function extractHttpsUrl(linkHeader) {
 		const links = linkHeader.split(' ');
 		const url = links[0].slice(1, -2);
 		const rel = links[1].match(/rel="(.*)"/)[1];
-		console.log("url", url, "rel", rel)
 		if (url && rel === "next") {
 			return url;
 		}

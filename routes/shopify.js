@@ -59,7 +59,6 @@ router.get('/shopify/callback', (req, res, next) => {
 		axios.post(`https://${shop}/admin/oauth/access_token?client_id=${SHOPIFY_CLIENT_ID}&client_secret=${SHOPIFY_CLIENT_SECRET}&code=${code}`)
 			.then(res => User.findOne({ _id: req.user._id })
 				.then(user => {
-					console.log(user);
 					if (!user.shops) user.shops = [];
 					const shopIndex = user.shops.findIndex(shop => {
 						return shop.name === req.query.shop;
@@ -106,7 +105,6 @@ router.post('/shopify/abandoned-checkouts', (req, res) => {
 			}
 		})
 			.then(response => {
-				console.log(response);
 				res.status(200).json(response.data);
 				// res.status(200).json({
 				// 	id: 'shopify.abandoned-checkout-metrics',

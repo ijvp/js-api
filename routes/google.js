@@ -222,7 +222,6 @@ router.post("/google/ads", async (req, res) => {
   const start = startDate.split("T")[0];
   const end = endDate.split("T")[0];
 
-  console.log(start, end);
   await account.report({
     from_date: start,
     to_date: end,
