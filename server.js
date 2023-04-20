@@ -27,7 +27,7 @@ const corsOptions = {
 		if (whitelist.indexOf(origin) !== -1) {
 			callback(null, true)
 		} else {
-			console.log("CORS error from origin", origin)
+			console.log("CORS error from origin", origin, process.env.FRONTEND_URL, origin == process.env.FRONTEND_URL)
 			callback(new Error('Not allowed by CORS'))
 		}
 	}
