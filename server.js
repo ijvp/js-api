@@ -20,11 +20,17 @@ const whitelist = [
 const corsOptions = {
 	credentials: true,
 	origin: function (origin, callback) {
+		console.log(corsOptions.req.headers);
+		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
+		console.log(forwardedHost);
+		if (forwardedHost === process.env.FRONTEND_URL) {
+			callback(null, true);
+		}
 		//Postman bypass for local development since it has no origin
-		if (process.env.NODE_ENV === "development" && !origin) {
+		else if (process.env.NODE_ENV === "development" && !origin) {
 			return callback(null, true);
 		}
-		if (whitelist.indexOf(origin) !== -1) {
+		else if (whitelist.indexOf(origin) !== -1) {
 			callback(null, true)
 		} else {
 			console.log("CORS error from origin", origin)
@@ -46,6 +52,11 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+	console.log(req.originalUrl)
+	corsOptions.req = req;
+	next();
+})
 app.use(cors(corsOptions));
 app.use('/', authRoutes);
 app.use('/', shopifyRoutes);
