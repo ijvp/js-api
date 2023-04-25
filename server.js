@@ -20,9 +20,7 @@ const whitelist = [
 const corsOptions = {
 	credentials: true,
 	origin: function (origin, callback) {
-		console.log(corsOptions.req.headers);
 		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
-		console.log(forwardedHost);
 		if (forwardedHost === process.env.FRONTEND_URL) {
 			callback(null, true);
 		}
@@ -53,7 +51,6 @@ app.use(passport.session());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
-	console.log(req.originalUrl)
 	corsOptions.req = req;
 	next();
 })
