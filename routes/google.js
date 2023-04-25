@@ -128,6 +128,8 @@ router.get('/google/accounts', async (req, res) => {
   const encryptedToken = getToken(req, 'google', 'refresh');
   const token = decrypt(encryptedToken);
 
+  console.log("encryptedToken", encryptedToken);
+  console.log("token", token);
   const customers = await client.listAccessibleCustomers(token).then(response => {
     return response.resource_names;
   }).catch(error => {

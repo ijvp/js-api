@@ -13,7 +13,7 @@ const decrypt = (cypher) => {
 //if platform == 'shopify', must also include store in req.body
 const getToken = (req, platform, type = "access") => {
 	const store = req.body?.store || req.query?.store;
-	if (!platform || !type || !store) {
+	if (!platform || !store) {
 		return;
 	}
 
