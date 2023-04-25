@@ -47,10 +47,11 @@ router.get('/google/callback', (req, res) => {
       User.findOne({ _id: req.user._id })
         .then(user => {
           const shopIndex = user.shops.findIndex(shop => shop.name === state);
+          console.log(token);
           const accessToken = encrypt(token.access_token);
           const refreshToken = encrypt(token.refresh_token);
-          console.log(token.access_token, accessToken);
-          console.log(token.refresh_token, refreshToken);
+          console.log(token.access_token, "\n", accessToken);
+          console.log(token.refresh_token, "\n", refreshToken);
           if (shopIndex < 0) {
             console.log("shop not found for this user");
           } else {
