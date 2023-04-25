@@ -131,7 +131,7 @@ router.get('/google/accounts', async (req, res) => {
   const customers = await client.listAccessibleCustomers(token).then(response => {
     return response.resource_names;
   }).catch(error => {
-    console.log(error);
+    console.log(error.details);
   });
 
   const managerIdList = [];

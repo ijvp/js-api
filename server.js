@@ -20,14 +20,14 @@ const whitelist = [
 const corsOptions = {
 	credentials: true,
 	origin: function (origin, callback) {
-		//Postman bypass since it has no origin
-		if (!origin) {
+		//Postman bypass for local development since it has no origin
+		if (process.env.NODE_ENV === "development" && !origin) {
 			return callback(null, true);
 		}
 		if (whitelist.indexOf(origin) !== -1) {
 			callback(null, true)
 		} else {
-			console.log("CORS error from origin", origin, process.env.FRONTEND_URL, origin == process.env.FRONTEND_URL)
+			console.log("CORS error from origin", origin)
 			callback(new Error('Not allowed by CORS'))
 		}
 	}
