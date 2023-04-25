@@ -27,7 +27,7 @@ const corsOptions = {
 			callback(null, true);
 		}
 		//Postman bypass for local development since it has no origin
-		else if (process.env.NODE_ENV === "development" && !origin) {
+		else if (!origin) {
 			return callback(null, true);
 		}
 		else if (whitelist.indexOf(origin) !== -1) {
