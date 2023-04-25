@@ -49,6 +49,8 @@ router.get('/google/callback', (req, res) => {
           const shopIndex = user.shops.findIndex(shop => shop.name === state);
           const accessToken = encrypt(token.access_token);
           const refreshToken = encrypt(token.refresh_token);
+          console.log(token.access_token, accessToken);
+          console.log(token.refresh_token, refreshToken);
           if (shopIndex < 0) {
             console.log("shop not found for this user");
           } else {
