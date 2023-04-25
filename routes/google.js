@@ -25,6 +25,7 @@ router.get('/google/authorize', async (req, res) => {
   const { store } = req.query;
   let redirect = oauth2Client.generateAuthUrl({
     access_type: 'offline',
+    prompt: 'consent',
     scope: [
       'https://www.googleapis.com/auth/adwords'
     ],
