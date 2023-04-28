@@ -49,7 +49,7 @@ router.get("/facebook/callback", async (req, res) => {
 
       return user;
     }).then(() => {
-      res.redirect(`${process.env.FRONTEND_URL}?facebook_authorized=true&facebook_authorized_store=${state}`);
+      res.redirect(`${process.env.FRONTEND_URL}/summary?facebook_authorized=true&facebook_authorized_store=${state}`);
     }).catch((error) => {
       return res.status(400).send(error);
     })
@@ -63,7 +63,7 @@ router.get("/facebook/callback", async (req, res) => {
 });
 
 
-//Rota para buscar as contadas administradas pelo usuário que fez o login, usamos o facebook_access_token do usuário logado para fazer a busca.
+//Rota para buscar as contas administradas pelo usuário que fez o login, usamos o facebook_access_token do usuário logado para fazer a busca.
 router.get("/facebook/accounts", async (req, res) => {
   if (!req.user) {
     return res.status(401).send('User need to be logged in')
@@ -92,7 +92,7 @@ router.get("/facebook/accounts", async (req, res) => {
 })
 
 
-//Rota para salvar as costas que serão mostradas no dashboard
+//Rota para buscar as contas que serão mostradas no dashboard
 //Essa rota pode salvar várias contas facebook para lojas diferentes, o shopName serve para a rota buscar o shop correspondente.
 // Body enviado
 // "clientsIds": [
@@ -103,7 +103,6 @@ router.get("/facebook/accounts", async (req, res) => {
 //         "account_id": account id na loja no facebook,
 //     }
 // ]
-
 router.post("/facebook/account/connect", async (req, res) => {
   const { business, store } = req.body;
 
@@ -128,43 +127,6 @@ router.post("/facebook/account/connect", async (req, res) => {
     res.status(200).json({
       success: true, message: `Facebook business ${business.name} added to ${store}`
     });
-    // await clientsIds.forEach(async (clientId) => {
-    //   let shopExists
-
-    //   try {
-    //     shopExists = user.shops.find((shop) => shop.name === clientId.shopName);
-
-    //     if (shopExists) {
-
-    //       const shopClientExists = shopExists.facebook_clients.find((shopClient) => decrypt(shopClient.facebook_client_id) === clientId.id
-    //       )
-
-    //       if (shopClientExists) {
-    //         if (shopClientExists.facebook_client_name !== clientId.name) {
-    //           shopClientExists.facebook_client_name = clientId.name;
-    //         }
-    //       } else {
-    //         shopExists.facebook_clients.push({
-    //           facebook_client_id: encrypt(clientId.id),
-    //           facebook_client_name: clientId.name,
-    //         })
-    //       }
-    //     }
-    //   } catch (error) {
-    //     console.log(error)
-    //   }
-    // })
-
-    // if (user !== undefined) {
-
-    //   user.markModified("User");
-    //   return user.save(() => {
-    //     res.status(200).json({ message: 'new clients added' });
-    //   })
-    // } else {
-    //   return res.status(404).send("user not find")
-    // }
-
   })
 
 })

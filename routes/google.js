@@ -63,7 +63,7 @@ router.get('/google/callback', (req, res) => {
         })
         .catch(err => console.log(err));
 
-      res.redirect(`${process.env.FRONTEND_URL}?google_authorized=true&google_authorized_store=${state}`);
+      res.redirect(`${process.env.FRONTEND_URL}/summary?google_authorized=true&google_authorized_store=${state}`);
     };
   });
 });
