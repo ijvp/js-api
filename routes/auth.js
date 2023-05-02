@@ -2,7 +2,7 @@ const router = require('express').Router();
 const passport = require('passport');
 const { decrypt } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const getCurrentUser = require('../utils/currentUser');
+const { checkAuth, getCurrentUser } = require('../utils/user');
 const { User } = require('../models/User');
 
 passport.use(User.createStrategy());
@@ -13,58 +13,77 @@ passport.deserializeUser((id, done) => {
 	User.findById(id, (err, user) => done(err, user));
 });
 
-//register user
 router.post('/auth/register', (req, res) => {
-	User.register({ username: req.body.username }, req.body.password)
+	const { username, password } = req.body;
+
+	if (!(username && password)) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' });
+	}
+
+	User.register({ username }, password)
 		.then(user => {
 			passport.authenticate('local')(req, res, () => {
-				res.status(200).json({ success: true, username: user.username });
+				res.status(201).json({ success: true, username: user.username, message: "User was successfully created" });
 			})
 		})
 		.catch(error => {
-			res.status(500).json({ success: false, message: error.message });
+			logger.error(error);
+			res.status(409).json({ success: false, message: error.message });
 		})
 });
 
-//login user
 router.post('/auth/login', (req, res) => {
+	const { username, password } = req.body;
+
+	if (!(username && password)) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' });
+	}
+
 	const user = new User({
-		username: req.body.username,
-		password: req.body.password
+		username: username,
+		password: password
 	});
 
 	req.login(user, err => {
 		if (err) {
 			logger.error(err);
+			return res.status(500).json({ success: false, message: 'Internal server error' });
 		} else {
-			passport.authenticate('local', { failureRedirect: '/login' })(req, res, () => {
-				// res.redirect('/')
-				const shopifyRedirect = res.req.user.shops.length === 0;
-				const user = getCurrentUser(req.user);
-				res.status(200).json({ success: true, shopifyRedirect: shopifyRedirect, user });
-			})
+			passport.authenticate('local', (err, user, info) => {
+				if (err) {
+					logger.error(err);
+					return res.status(500).json({ success: false, message: 'Internal server error' });
+				}
+
+				if (!user) {
+					return res.status(401).json({ success: false, message: 'Authentication failed' });
+				}
+
+				if (info) {
+					logger.info(info);
+				}
+
+				const shopifyRedirect = user.shops.length === 0;
+				const currentUser = getCurrentUser(user);
+				res.status(200).json({ success: true, shopifyRedirect: shopifyRedirect, user: currentUser });
+			})(req, res)
 		}
 	});
 });
 
-//logout user
-router.get('/auth/logout', (req, res, next) => {
+router.get('/auth/logout', checkAuth, (req, res, next) => {
 	req.logout(err => {
 		if (err) {
-			return next(err);
+			logger.error(err);
+			return res.status(500).json({ success: false, message: 'Logout failed: ' + err.message })
 		}
 		res.clearCookie('connect.sid');
-		res.json({ success: true, message: 'logged out' })
-		res.end();
+		res.status(200).json({ success: true, message: 'logged out' })
 	});
 });
 
-router.get('/auth/me', (req, res) => {
-	if (req.user) {
-		res.status(200).json(getCurrentUser(req.user));
-	} else {
-		res.status(401).json({ success: false, error: 'Not logged in' });
-	}
+router.get('/auth/me', checkAuth, (req, res) => {
+	res.status(200).json(getCurrentUser(req.user));
 });
 
 module.exports = router;

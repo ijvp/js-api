@@ -13,14 +13,14 @@ const facebookRoutes = require('./routes/facebook');
 const port = process.env.PORT || 8080;
 const app = express();
 
+//cors config
 const whitelist = [
 	process.env.FRONTEND_URL
 ];
-
-
 const corsOptions = {
 	credentials: true,
 	origin: function (origin, callback) {
+		//TODO: test this line and other corsOption.req middleware
 		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
 		if (forwardedHost === process.env.FRONTEND_URL) {
 			callback(null, true);
@@ -37,7 +37,13 @@ const corsOptions = {
 		}
 	}
 };
+app.use(cors(corsOptions));
+app.use((req, res, next) => {
+	corsOptions.req = req;
+	next();
+});
 
+//passport session config
 app.use(session({
 	secret: process.env.SESSION_SECRET,
 	resave: false,
@@ -47,20 +53,21 @@ app.use(session({
 		sameSite: process.env.NODE_ENV === 'development' ? 'lax' : 'none'
 	}
 }));
-app.use(passport.initialize());
 app.use(passport.session());
+app.use(passport.initialize());
+
+//app encoding config
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use((req, res, next) => {
-	corsOptions.req = req;
-	next();
-});
-app.use(cors(corsOptions));
+
+
+//app routes config
 app.use('/', authRoutes);
 app.use('/', shopifyRoutes);
 app.use('/', googleRoutes);
 app.use('/', facebookRoutes);
 
+//tell express to allow nginx
 app.set('trust proxy', 1);
 
 app.listen(port, () => {

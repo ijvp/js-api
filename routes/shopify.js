@@ -4,7 +4,7 @@ const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
 const { getStoreApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
-const moment = require('moment');
+const { checkAuth } = require('../utils/user');
 
 const localState = 'n159-uimp02430u18r4bnty3920b1y382458';
 const { SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } = process.env;
@@ -21,15 +21,11 @@ router.get('/shopify/authorize', (req, res) => {
 //accepts store url and access token, and saves to current user
 //this endpoint is used by the custom app architecture where
 //an individual app must be created for each store inside the Shopify Admin panel
-router.post('/shopify/connect', (req, res) => {
+router.post('/shopify/connect', checkAuth, (req, res) => {
 	const { store, access_token } = req.body;
 
-	if (!store) {
-		res.status(400).send("Missing store parameter");
-	}
-
-	if (!access_token) {
-		res.status(400).send("Missing access token");
+	if (!(store && access_token)) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	}
 
 	User.findById(req.user._id)
@@ -43,15 +39,16 @@ router.post('/shopify/connect', (req, res) => {
 			user.markModified("shops");
 			user.save(err => {
 				if (err) {
-					console.log(err);
+					logger.error(err);
+					return res.status(500).json({ success: false, message: 'Internal server error' });
 				} else {
-					res.status(200).send("Loja adicionada com sucesso");
+					res.status(201).json({ success: true, message: 'Store connected to account' });
 				}
 			})
 		});
 });
 
-router.get('/shopify/callback', (req, res, next) => {
+router.get('/shopify/callback', checkAuth, (req, res, next) => {
 	const { code, hmac, state, shop } = req.query;
 
 	//TODO: hmac, state, shop-regex security checks
@@ -88,7 +85,62 @@ router.get('/shopify/callback', (req, res, next) => {
 	}
 });
 
-router.post('/shopify/abandoned-checkouts', (req, res) => {
+//currently only returns paid orders
+//parameters: store: String, start (Date), end (Date), granularity: 'day' | 'hour',
+//triplewhale additional parameters: match? [], metricsBreakdown: boolean, shopId (shop.name)
+router.post('/shopify/orders', (req, res) => {
+	const { store, start, end, granularity } = req.body;
+	if (!(store && start && granularity)) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
+	};
+
+	const shopifyAccessToken = getToken(req, 'shopify');
+	if (!shopifyAccessToken) {
+		return res.status(403).json({ success: false, message: 'User cannot perform queries on behalf of this store' });
+	}
+
+	//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
+	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
+	let allOrders = [];
+	let ordersEndpoint = `${getStoreApiURL(store)}/orders.json`;
+
+	const fetchOrders = () => {
+		axios.get(ordersEndpoint, {
+			params: {
+				created_at_min: start,
+				created_at_max: endIncremented,
+				financial_status: 'paid',
+				status: 'any',
+				limit: 250
+			},
+			headers: {
+				'X-Shopify-Access-Token': decrypt(shopifyAccessToken)
+			}
+		})
+			.then(response => {
+				//alguns pedidos podem ter sidos cancelados depois de pagos
+				const trueOrders = response.data.orders.filter(order => order.cancelled_at === null);
+				allOrders = allOrders.concat(trueOrders);
+				ordersEndpoint = extractHttpsUrl(response.headers.link);
+				if (ordersEndpoint) {
+					fetchOrders(); // Call the function recursively to continue fetching orders
+				} else {
+					res.status(200).json({
+						id: 'shopify.order-metrics',
+						metricsBreakdown: getMetrics(allOrders, granularity)
+					});
+				}
+			})
+			.catch(error => {
+				logger.error(error.data);
+				res.status(500).json({ sucess: false, message: 'Internal server error' });
+			});
+	}
+
+	fetchOrders();
+});
+
+router.post('/shopify/abandoned-checkouts', checkAuth, (req, res) => {
 	const shopifyAccessToken = getToken(req, 'shopify');
 	const { store, start, end, granularity } = req.body;
 
@@ -112,48 +164,6 @@ router.post('/shopify/abandoned-checkouts', (req, res) => {
 				// });
 			})
 			.catch(error => logger.error(error));
-	}
-});
-
-//currently only returns paid orders
-//parameters: store: String, start (Date), end (Date), granularity: 'day' | 'hour',
-//triplewhale additional parameters: match? [], metricsBreakdown: boolean, shopId (shop.name)
-router.post('/shopify/orders', (req, res) => {
-	const shopifyAccessToken = getToken(req, 'shopify');
-	const { store, start, end, granularity } = req.body;
-
-	if (shopifyAccessToken) {
-		//frontend will set start and end to the same date for a single day of data, granularity must be 'hour'!
-		let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
-		let allOrders = [];
-		let ordersEndpoint = `${getStoreApiURL(store)}/orders.json?created_at_min=${start}&created_at_max=${endIncremented}&financial_status=paid&status=any&limit=250`;
-
-		const fetchOrders = () => {
-			axios.get(ordersEndpoint, {
-				headers: {
-					'X-Shopify-Access-Token': decrypt(shopifyAccessToken)
-				}
-			})
-				.then(response => {
-					//alguns pedidos podem ter sidos cancelados depois de pagos
-					const trueOrders = response.data.orders.filter(order => order.cancelled_at === null);
-					allOrders = allOrders.concat(trueOrders);
-					ordersEndpoint = extractHttpsUrl(response.headers.link);
-					if (ordersEndpoint) {
-						fetchOrders(); // Call the function recursively to continue fetching orders
-					} else {
-						res.status(200).json({
-							id: 'shopify.order-metrics',
-							metricsBreakdown: getMetrics(allOrders, granularity)
-						});
-					}
-				})
-				.catch(error => {
-					logger.error(error.data);
-				});
-		}
-
-		fetchOrders();
 	}
 });
 

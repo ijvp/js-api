@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const logger = require('./logger');
+
 const connect = () => {
 	mongoose.set('strictQuery', true); //warning suppression
 	mongoose.connect(process.env.DB_CONNECT)
