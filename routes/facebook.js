@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
+const logger = require('../utils/logger');
 const axios = require('axios');
 const { differenceInDays, parseISO } = require('date-fns');
 
@@ -43,7 +44,7 @@ router.get("/facebook/callback", async (req, res) => {
         user.facebook_manager_id = clientId;
         user.markModified("shops");
         user.save(err => {
-          if (err) console.log(err);
+          if (err) logger.error(err);
         });
       }
 
@@ -86,7 +87,7 @@ router.get("/facebook/accounts", async (req, res) => {
 
       return res.status(200).send(allAccounts);
     } catch (error) {
-      console.log(error);
+      logger.error(error);
     }
   })
 })
@@ -121,7 +122,7 @@ router.post("/facebook/account/connect", async (req, res) => {
         business_name: business.name
       };
       user.markModified("shops");
-      user.save(err => err && console.log(err))
+      user.save(err => err && logger.error(err))
     };
 
     res.status(200).json({
@@ -144,12 +145,7 @@ router.get("/facebook/account/disconnect", async (req, res) => {
     },
     { new: true },
     (err, user) => {
-      if (err) {
-        console.log(err);
-      } else {
-        const shop = user.shops.find(shop => shop.name === store);
-        console.log(shop);
-      }
+      if (err) logger.error(err);
     }
   );
 
@@ -231,7 +227,7 @@ router.post("/facebook/ads", async (req, res) => {
       url = response.data.paging?.next;
     } while (url);
   } catch (error) {
-    console.log(error.response.data);
+    logger.error(error.response.data);
   }
 
   res.status(200).json(campaign);

@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
+const logger = require('../utils/logger');
 const { google } = require('googleapis');
 const { GoogleAdsApi } = require('google-ads-api');
 const { differenceInDays, parseISO } = require('date-fns');
@@ -57,11 +58,11 @@ router.get('/google/callback', (req, res) => {
             user.shops[shopIndex].google_refresh_token = refreshToken;
             user.markModified("shops");
             user.save(err => {
-              if (err) console.log(err);
+              if (err) logger.error(err);
             });
           }
         })
-        .catch(err => console.log(err));
+        .catch(err => logger.error(err));
 
       res.redirect(`${process.env.FRONTEND_URL}/summary?google_authorized=true&google_authorized_store=${state}`);
     };
@@ -83,7 +84,7 @@ router.post("/google/account/connect", (req, res) => {
       };
       user.markModified("shops");
       user.save(err => {
-        if (err) console.log(err);
+        if (err) logger.error(err);
       });
     }
   });
@@ -107,13 +108,8 @@ router.get('/google/account/disconnect', async (req, res) => {
       },
     },
     { new: true },
-    (err, user) => {
-      if (err) {
-        console.log(err);
-      } else {
-        const shop = user.shops.find(shop => shop.name === store);
-        console.log(shop);
-      }
+    (err) => {
+      if (err) logger.error(err);
     }
   );
 
@@ -132,7 +128,7 @@ router.get('/google/accounts', async (req, res) => {
   const customers = await client.listAccessibleCustomers(token).then(response => {
     return response.resource_names;
   }).catch(error => {
-    console.log(error.details);
+    logger.error(error.details);
   });
 
   const managerIdList = [];
@@ -155,7 +151,7 @@ router.get('/google/accounts', async (req, res) => {
         }
       })
     }).catch(error => {
-      console.log(error)
+      logger.error(error)
     });
   })
 
@@ -177,7 +173,7 @@ router.post("/google/accounts/manager", async (req, res) => {
 
     user.markModified("User");
     user.save(err => {
-      if (err) console.log(err);
+      if (err) logger.error(err);
     })
 
     return user;
@@ -272,7 +268,7 @@ router.post("/google/ads", async (req, res) => {
       return res.status(200).json(metrics);
     })
     .catch(error => {
-      console.log(error)
+      logger.error(error)
     })
 });
 

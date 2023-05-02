@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const passport = require('passport');
 const { decrypt } = require('../utils/crypto');
+const logger = require('../utils/logger');
 const getCurrentUser = require('../utils/currentUser');
 const { User } = require('../models/User');
 
@@ -34,7 +35,7 @@ router.post('/auth/login', (req, res) => {
 
 	req.login(user, err => {
 		if (err) {
-			console.log(err);
+			logger.error(err);
 		} else {
 			passport.authenticate('local', { failureRedirect: '/login' })(req, res, () => {
 				// res.redirect('/')

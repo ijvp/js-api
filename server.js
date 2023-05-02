@@ -4,6 +4,7 @@ const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
 const connect = require('./utils/connect');
+const logger = require('./utils/logger');
 const authRoutes = require('./routes/auth');
 const shopifyRoutes = require('./routes/shopify');
 const googleRoutes = require('./routes/google');
@@ -31,7 +32,7 @@ const corsOptions = {
 		else if (whitelist.indexOf(origin) !== -1) {
 			callback(null, true)
 		} else {
-			console.log('CORS error from origin', origin);
+			logger.error('CORS error from origin', origin);
 			callback(new Error('Not allowed by CORS'))
 		}
 	}
@@ -63,6 +64,6 @@ app.use('/', facebookRoutes);
 app.set('trust proxy', 1);
 
 app.listen(port, () => {
-	console.log('Server running on port %d', port);
+	logger.info('Server running on port %d', port);
 	connect();
 });

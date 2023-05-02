@@ -2,6 +2,7 @@ const router = require('express').Router();
 const axios = require('axios');
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
+const logger = require('../utils/logger');
 const { getStoreApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
 const moment = require('moment');
 
@@ -55,7 +56,6 @@ router.get('/shopify/callback', (req, res, next) => {
 
 	//TODO: hmac, state, shop-regex security checks
 	if (state === localState) {
-		console.log(req)
 		axios.post(`https://${shop}/admin/oauth/access_token?client_id=${SHOPIFY_CLIENT_ID}&client_secret=${SHOPIFY_CLIENT_SECRET}&code=${code}`)
 			.then(res => User.findOne({ _id: req.user._id })
 				.then(user => {
@@ -76,11 +76,11 @@ router.get('/shopify/callback', (req, res, next) => {
 					//TODO: further investigate diff between find() ==> save() and findOneAndUpdate()
 					user.markModified("shops");
 					user.save(err => {
-						if (err) console.log(err);
+						if (err) logger.error(err);
 					})
 				})
 			)
-			.catch(err => console.error(err));
+			.catch(err => logger.error(err));
 
 		res.redirect(process.env.FRONTEND_URL);
 	} else {
@@ -111,7 +111,7 @@ router.post('/shopify/abandoned-checkouts', (req, res) => {
 				// 	metricsBreakdown: getMetrics(response.data.checkouts, granularity)
 				// });
 			})
-			.catch(error => console.log(error));
+			.catch(error => logger.error(error));
 	}
 });
 
@@ -149,7 +149,7 @@ router.post('/shopify/orders', (req, res) => {
 					}
 				})
 				.catch(error => {
-					console.log(error.data);
+					logger.error(error.data);
 				});
 		}
 
