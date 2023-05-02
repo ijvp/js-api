@@ -13,7 +13,6 @@ const facebookRoutes = require('./routes/facebook');
 const port = process.env.PORT || 8080;
 const app = express();
 
-//cors config
 const whitelist = [
 	process.env.FRONTEND_URL
 ];
@@ -37,13 +36,7 @@ const corsOptions = {
 		}
 	}
 };
-app.use(cors(corsOptions));
-app.use((req, res, next) => {
-	corsOptions.req = req;
-	next();
-});
 
-//passport session config
 app.use(session({
 	secret: process.env.SESSION_SECRET,
 	resave: false,
@@ -53,15 +46,17 @@ app.use(session({
 		sameSite: process.env.NODE_ENV === 'development' ? 'lax' : 'none'
 	}
 }));
-app.use(passport.session());
 app.use(passport.initialize());
-
-//app encoding config
+app.use(passport.session());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors(corsOptions));
+app.use((req, res, next) => {
+	corsOptions.req = req;
+	next();
+});
 
 
-//app routes config
 app.use('/', authRoutes);
 app.use('/', shopifyRoutes);
 app.use('/', googleRoutes);
