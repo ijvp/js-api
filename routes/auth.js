@@ -40,33 +40,20 @@ router.post('/auth/login', (req, res) => {
 	}
 
 	const user = new User({
-		username: username,
-		password: password
+		username,
+		password
 	});
 
 	req.login(user, err => {
 		if (err) {
 			logger.error(err);
-			return res.status(500).json({ success: false, message: 'Internal server error' });
+			res.status(500).json({ success: false, message: 'Internal server error' });
 		} else {
-			passport.authenticate('local', (err, user, info) => {
-				if (err) {
-					logger.error(err);
-					return res.status(500).json({ success: false, message: 'Internal server error' });
-				}
-
-				if (!user) {
-					return res.status(401).json({ success: false, message: 'Authentication failed' });
-				}
-
-				if (info) {
-					logger.info(info);
-				}
-
-				const shopifyRedirect = user.shops.length === 0;
-				const currentUser = getCurrentUser(user);
-				res.status(200).json({ success: true, shopifyRedirect: shopifyRedirect, user: currentUser });
-			})(req, res)
+			passport.authenticate('local')(req, res, () => {
+				const shopifyRedirect = res.req.user.shops.length === 0;
+				const user = getCurrentUser(req.user);
+				res.status(200).json({ success: true, shopifyRedirect: shopifyRedirect, user });
+			})
 		}
 	});
 });

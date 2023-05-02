@@ -81,6 +81,7 @@ router.get('/shopify/callback', checkAuth, (req, res, next) => {
 
 		res.redirect(process.env.FRONTEND_URL);
 	} else {
+		logger.warn("Security check failed for callback!")
 		res.status(401).send('Security check failed, check state, hmac, or shop parameter');
 	}
 });
@@ -88,33 +89,35 @@ router.get('/shopify/callback', checkAuth, (req, res, next) => {
 //currently only returns paid orders
 //parameters: store: String, start (Date), end (Date), granularity: 'day' | 'hour',
 //triplewhale additional parameters: match? [], metricsBreakdown: boolean, shopId (shop.name)
-router.post('/shopify/orders', (req, res) => {
+router.post('/shopify/orders', checkAuth, (req, res) => {
 	const { store, start, end, granularity } = req.body;
 	if (!(store && start && granularity)) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
 	const shopifyAccessToken = getToken(req, 'shopify');
-	if (!shopifyAccessToken) {
-		return res.status(403).json({ success: false, message: 'User cannot perform queries on behalf of this store' });
+	const token = decrypt(shopifyAccessToken);
+	if (!token) {
+		return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
 	}
 
 	//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
 	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
 	let allOrders = [];
 	let ordersEndpoint = `${getStoreApiURL(store)}/orders.json`;
+	let params = {
+		created_at_min: start,
+		created_at_max: endIncremented,
+		financial_status: 'paid',
+		status: 'any',
+		limit: 250
+	};
 
 	const fetchOrders = () => {
 		axios.get(ordersEndpoint, {
-			params: {
-				created_at_min: start,
-				created_at_max: endIncremented,
-				financial_status: 'paid',
-				status: 'any',
-				limit: 250
-			},
+			params,
 			headers: {
-				'X-Shopify-Access-Token': decrypt(shopifyAccessToken)
+				'X-Shopify-Access-Token': token
 			}
 		})
 			.then(response => {
@@ -123,6 +126,7 @@ router.post('/shopify/orders', (req, res) => {
 				allOrders = allOrders.concat(trueOrders);
 				ordersEndpoint = extractHttpsUrl(response.headers.link);
 				if (ordersEndpoint) {
+					params = undefined; //must clear original query parameters otherwise new endpoint will return 400
 					fetchOrders(); // Call the function recursively to continue fetching orders
 				} else {
 					res.status(200).json({
@@ -132,39 +136,64 @@ router.post('/shopify/orders', (req, res) => {
 				}
 			})
 			.catch(error => {
-				logger.error(error.data);
+				logger.error(error);
 				res.status(500).json({ sucess: false, message: 'Internal server error' });
 			});
-	}
+	};
 
 	fetchOrders();
 });
 
 router.post('/shopify/abandoned-checkouts', checkAuth, (req, res) => {
-	const shopifyAccessToken = getToken(req, 'shopify');
 	const { store, start, end, granularity } = req.body;
 
-	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
+	if (!(store && start && granularity)) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
+	};
 
-	if (shopifyAccessToken) {
-		axios.get(`${getStoreApiURL(req.body.store)}/checkouts.json`, {
-			params: {
-				created_at_max: endIncremented,
-				limit: 250
-			},
+	const shopifyAccessToken = getToken(req, 'shopify');
+	const token = decrypt(shopifyAccessToken);
+	if (!token) {
+		return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
+	}
+
+	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
+	let allAbandonedCheckouts = [];
+	let abandonedCheckoutEndpoint = `${getStoreApiURL(store)}/checkouts.json`;
+	let params = {
+		created_at_min: start,
+		created_at_max: endIncremented,
+		limit: 250
+	}
+
+	const fetchAbandonedCheckouts = () => {
+		axios.get(abandonedCheckoutEndpoint, {
+			params: params,
 			headers: {
-				'X-Shopify-Access-Token': decrypt(shopifyAccessToken)
+				'X-Shopify-Access-Token': token
 			}
 		})
 			.then(response => {
-				res.status(200).json(response.data);
-				// res.status(200).json({
-				// 	id: 'shopify.abandoned-checkout-metrics',
-				// 	metricsBreakdown: getMetrics(response.data.checkouts, granularity)
-				// });
+				const { checkouts } = response.data;
+				allAbandonedCheckouts = allAbandonedCheckouts.concat(checkouts);
+				abandonedCheckoutEndpoint = extractHttpsUrl(response.headers.link);
+				if (abandonedCheckoutEndpoint) {
+					params = undefined;
+					fetchAbandonedCheckouts();
+				} else {
+					res.status(200).json({
+						id: 'shopify.abandoned-checkout-metrics',
+						metricsBreakdown: getMetrics(allAbandonedCheckouts, granularity)
+					});
+				}
 			})
-			.catch(error => logger.error(error));
-	}
+			.catch(error => {
+				logger.error(error);
+				res.status(500).json({ success: false, message: 'Internal server error' });
+			});
+	};
+
+	fetchAbandonedCheckouts();
 });
 
 module.exports = router;

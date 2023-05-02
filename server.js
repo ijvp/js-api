@@ -13,7 +13,7 @@ const facebookRoutes = require('./routes/facebook');
 const port = process.env.PORT || 8080;
 const app = express();
 
-//cors config
+// CORS middleware
 const whitelist = [
 	process.env.FRONTEND_URL
 ];
@@ -37,13 +37,14 @@ const corsOptions = {
 		}
 	}
 };
-app.use(cors(corsOptions));
+
 app.use((req, res, next) => {
 	corsOptions.req = req;
 	next();
 });
+app.use(cors(corsOptions));
 
-//passport session config
+// Session middleware
 app.use(session({
 	secret: process.env.SESSION_SECRET,
 	resave: false,
@@ -53,21 +54,22 @@ app.use(session({
 		sameSite: process.env.NODE_ENV === 'development' ? 'lax' : 'none'
 	}
 }));
-app.use(passport.session());
-app.use(passport.initialize());
 
-//app encoding config
+// Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
+// App encoding config
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-//app routes config
+// App routes config
 app.use('/', authRoutes);
 app.use('/', shopifyRoutes);
 app.use('/', googleRoutes);
 app.use('/', facebookRoutes);
 
-//tell express to allow nginx
+// Tell express to allow nginx
 app.set('trust proxy', 1);
 
 app.listen(port, () => {

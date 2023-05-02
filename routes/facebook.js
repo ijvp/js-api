@@ -2,12 +2,16 @@ const router = require('express').Router();
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
+const { checkAuth } = require('../utils/user');
 const axios = require('axios');
 const { differenceInDays, parseISO } = require('date-fns');
 
 //Login facebook, quando usuário finalizar login chama a rota callback
 router.get("/facebook/authorize", async (req, res) => {
   const { store } = req.query;
+  if (!store) {
+    return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
+  }
   return res.status(200).json(`https://www.facebook.com/${process.env.FACEBOOK_API_VERSION}/dialog/oauth?client_id=${process.env.FACEBOOK_API_CLIENT_ID}&redirect_uri=${process.env.FACEBOOK_API_REDIRECT_URL}&scope=${process.env.FACEBOOK_API_SCOPES}&state=${store}`)
 });
 
@@ -65,13 +69,12 @@ router.get("/facebook/callback", async (req, res) => {
 
 
 //Rota para buscar as contas administradas pelo usuário que fez o login, usamos o facebook_access_token do usuário logado para fazer a busca.
-router.get("/facebook/accounts", async (req, res) => {
-  if (!req.user) {
-    return res.status(401).send('User need to be logged in')
-  }
-
+router.get("/facebook/accounts", checkAuth, async (req, res) => {
   const encryptedToken = getToken(req, 'facebook', 'access');
   const token = decrypt(encryptedToken);
+  if (!token) {
+    return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
+  }
 
   User.findById(req.user._id).then(async user => {
     try {
@@ -85,9 +88,10 @@ router.get("/facebook/accounts", async (req, res) => {
         url = accounts.paging.next;
       }
 
-      return res.status(200).send(allAccounts);
+      return res.status(200).json(allAccounts);
     } catch (error) {
       logger.error(error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
     }
   })
 })
@@ -104,18 +108,18 @@ router.get("/facebook/accounts", async (req, res) => {
 //         "account_id": account id na loja no facebook,
 //     }
 // ]
-router.post("/facebook/account/connect", async (req, res) => {
+router.post("/facebook/account/connect", checkAuth, async (req, res) => {
   const { business, store } = req.body;
 
-  if (!req.user) {
-    return res.status(401).send('User need to be logged in')
+  if (!(business && store)) {
+    return res.status(400).json({ success: false, message: 'Invalid request body' });
   }
 
   await User.findById(req.user.id).then(async user => {
     const shop = user.shops.find((shop) => shop.name === store);
 
     if (!shop) {
-      console.log(`A store with this name:${store} was not found for this user`);
+      return res.status(404).json({ success: false, message: 'Store not found' })
     } else {
       shop.facebook_business = {
         business_id: business.account_id,
@@ -125,16 +129,19 @@ router.post("/facebook/account/connect", async (req, res) => {
       user.save(err => err && logger.error(err))
     };
 
-    res.status(200).json({
+    res.status(201).json({
       success: true, message: `Facebook business ${business.name} added to ${store}`
     });
   })
 
 })
 
-router.get("/facebook/account/disconnect", async (req, res) => {
+router.get("/facebook/account/disconnect", checkAuth, async (req, res) => {
   const { store } = req.query;
 
+  if (!store) {
+    return res.status(400).json({ success: false, message: 'Invalid request query' })
+  };
   User.findOneAndUpdate(
     { _id: req.user._id, "shops.name": store },
     {
@@ -145,37 +152,32 @@ router.get("/facebook/account/disconnect", async (req, res) => {
     },
     { new: true },
     (err, user) => {
-      if (err) logger.error(err);
+      if (err) {
+        logger.error(err);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+      } else {
+        res.status(204).json({ success: true, message: `Removed Facebook Ads account from ${store}` });
+      }
     }
   );
-
-  res.status(200).json({ success: true, message: `Removed Facebook Ads account from ${store}` });
 });
 
 //Rota para buscar os gastos, e o roas de uma conta no facebook business
 // Tem que ser enviado o id da loja, a rota usa o access token do usuario a rota usa o access token do usuário ao id do das cotas administradas pelo usuário logado 
 // O startDate e o endDate tem que ser enviados no padrão yyyy-mm-dd
-router.post("/facebook/ads", async (req, res) => {
-  const { shopName, startDate, endDate } = req.body;
+router.post("/facebook/ads", checkAuth, async (req, res) => {
+  const { store, start, end } = req.body;
 
-  if (!req.user) {
-    return res.status(401).send('User need to be logged in');
-  }
-
-  if (!startDate || !endDate) {
-    return res.status(400).send('Start date and end date must be filled');
-  }
-
-  if (!shopName) {
-    return res.status(400).send("Shop name must be filled")
+  if (!(store && start && end)) {
+    return res.status(400).json({ success: false, message: 'Invalid request body' });
   }
 
   let userData = req.user;
 
-  let shop = await userData.shops.find((shop) => shop.name === shopName);
+  let shop = await userData.shops.find((shop) => shop.name === store);
 
   if (!shop) {
-    return res.status(404).send("Shop not found or user does not have permission")
+    return res.status(404).send("Store not found")
   }
 
   if (!shop.facebook_business) {
@@ -187,13 +189,13 @@ router.post("/facebook/ads", async (req, res) => {
     metricsBreakdown: []
   };
 
-  const isSingleDay = differenceInDays(parseISO(String(endDate)), parseISO(String(startDate))) === 0;
-  const start = startDate.split("T")[0];
-  const end = endDate.split("T")[0];
+  const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start))) === 0;
+  const since = start.split("T")[0];
+  const until = end.split("T")[0];
 
   let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/act_${shop.facebook_business.business_id}/insights`;
   let params = {
-    time_range: { since: start, until: end },
+    time_range: { since, until },
     level: "account",
     fields: "campaign_name,adset_name,ad_name,spend,purchase_roas",
     access_token: decrypt(shop.facebook_access_token)
@@ -228,6 +230,7 @@ router.post("/facebook/ads", async (req, res) => {
     } while (url);
   } catch (error) {
     logger.error(error.response.data);
+    return res.status(500).json({ success: false, message: 'Internal server error' })
   }
 
   res.status(200).json(campaign);

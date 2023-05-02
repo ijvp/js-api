@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
+const { checkAuth } = require('../utils/user');
 const { google } = require('googleapis');
 const { GoogleAdsApi } = require('google-ads-api');
 const { differenceInDays, parseISO } = require('date-fns');
@@ -24,6 +25,10 @@ const client = new GoogleAdsApi({
 //and send the selected store in state variable
 router.get('/google/authorize', async (req, res) => {
   const { store } = req.query;
+  if (!store) {
+    return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
+  }
+
   let redirect = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
@@ -52,7 +57,7 @@ router.get('/google/callback', (req, res) => {
           const accessToken = encrypt(token.access_token);
           const refreshToken = encrypt(token.refresh_token);
           if (shopIndex < 0) {
-            console.log("shop not found for this user");
+            logger.info("No stores associated with this user")
           } else {
             user.shops[shopIndex].google_access_token = accessToken;
             user.shops[shopIndex].google_refresh_token = refreshToken;
@@ -70,13 +75,17 @@ router.get('/google/callback', (req, res) => {
 });
 
 //Connect a google account to one of the users shops
-router.post("/google/account/connect", (req, res) => {
+router.post("/google/account/connect", checkAuth, (req, res) => {
   const { client, store } = req.body;
+  if (!(client && store)) {
+    return res.status(400).send({ success: false, message: 'Invalid request body' });
+  }
+
   User.findById(req.user._id).then(user => {
     const shop = user.shops.find((shop) => shop.name === store);
 
     if (!shop) {
-      console.log(`A store with this name:${store} was not found for this user`)
+      return res.status(404).json({ success: false, message: `Store ${store} not found` });
     } else {
       shop.google_client = {
         client_id: client.id,
@@ -84,20 +93,26 @@ router.post("/google/account/connect", (req, res) => {
       };
       user.markModified("shops");
       user.save(err => {
-        if (err) logger.error(err);
+        if (err) {
+          logger.error(err);
+          return res.status(500).json({ success: false, message: 'Internal server error' });
+        } else {
+          res.status(201).json({
+            success: true, message: `Google Ads account ${client.descriptive_name} added to ${store}`
+          });
+        }
       });
     }
-  });
-
-  res.status(200).json({
-    success: true, message: `Google Ads account ${client.descriptive_name} added to ${store}`
   });
 });
 
 //Disconnects google account from a user's shop
-router.get('/google/account/disconnect', async (req, res) => {
+router.get('/google/account/disconnect', checkAuth, async (req, res) => {
   const { store } = req.query;
 
+  if (!store) {
+    return res.status(400).json({ success: false, message: 'Invalid request query' })
+  }
   User.findOneAndUpdate(
     { _id: req.user._id, "shops.name": store },
     {
@@ -109,39 +124,39 @@ router.get('/google/account/disconnect', async (req, res) => {
     },
     { new: true },
     (err) => {
-      if (err) logger.error(err);
+      if (err) {
+        logger.error(err);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+      } else {
+        res.status(204).json({ success: true, message: `Removed Google Ads account from ${store}` });
+      }
     }
   );
-
-  res.status(200).json({ success: true, message: `Removed Google Ads account from ${store}` });
 });
 
 //Gets all Google Ads account associated with authorized Google account
-router.get('/google/accounts', async (req, res) => {
-  if (!req.user) {
-    return res.status(401).send('User need to be logged in')
-  }
-
+router.get('/google/accounts', checkAuth, async (req, res) => {
   const encryptedToken = getToken(req, 'google', 'refresh');
   const token = decrypt(encryptedToken);
+  if (!token) {
+    return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
+  }
 
-  const customers = await client.listAccessibleCustomers(token).then(response => {
+  const customers = client.listAccessibleCustomers(token).then(response => {
     return response.resource_names;
   }).catch(error => {
     logger.error(error.details);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
   });
 
   const managerIdList = [];
   const promises = customers.map(async (resourceName) => {
-
     const customerId = `${resourceName.split('customers/')[1]}`;
-
     const accountList = client.Customer({
       customer_id: customerId,
       refresh_token: `${token}`,
     });
-
-    return await accountList.report({
+    accountList.report({
       entity: 'customer_client',
       attributes: ['customer_client.id', 'customer_client.resource_name', 'customer_client.descriptive_name'],
     }).then(response => {
@@ -151,22 +166,19 @@ router.get('/google/accounts', async (req, res) => {
         }
       })
     }).catch(error => {
-      logger.error(error)
+      logger.error(error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
     });
   })
 
   await Promise.all(promises);
 
-  return res.status(200).json(managerIdList)
+  res.status(200).json(managerIdList)
 })
 
 //Save google_manager_id to req.user
-router.post("/google/accounts/manager", async (req, res) => {
+router.post("/google/accounts/manager", checkAuth, async (req, res) => {
   const { managerId } = req.body;
-
-  if (!req.user) {
-    return res.status(401).send('User need to be logged in')
-  }
 
   User.findById(req.user._id).then(user => {
     user.google_manager_id = managerId;
@@ -184,29 +196,20 @@ router.post("/google/accounts/manager", async (req, res) => {
   })
 });
 
-router.post("/google/ads", async (req, res) => {
-  const { startDate, endDate, shopName } = req.body;
-
-  if (!req.user) {
-    return res.status(401).send('User need to be logged in');
+router.post("/google/ads", checkAuth, async (req, res) => {
+  const { startDate, endDate, store } = req.body;
+  if (!store) {
+    return res.status(400).send('Invalid request body, missing store')
   }
-
-  if (req.user.shops.length === 0) {
-    return res.status(400).send('No shop found');
-  }
-
   if (!startDate && !endDate) {
-    return res.status(400).send("Start date and end date must be set");
+    return res.status(400).send('Start date and end date must be set');
   }
-
-  let shop = await req.user.shops.find((shop) => shop.name === shopName);
-
+  let shop = await req.user.shops.find((shop) => shop.name === store);
   if (!shop) {
-    return res.status(404).send("Shop not found or does not have permission");
+    return res.status(404).send('Store not found');
   }
-
   if (!shop.google_client) {
-    return res.status(404).send("No clients found");
+    return res.status(404).send('No client associated with this store');
   }
 
   const account = client.Customer({
@@ -268,8 +271,9 @@ router.post("/google/ads", async (req, res) => {
       return res.status(200).json(metrics);
     })
     .catch(error => {
-      logger.error(error)
-    })
+      logger.error(error);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    });
 });
 
 module.exports = router;
