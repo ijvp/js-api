@@ -5,10 +5,6 @@ const { ShopSchema } = require('./Shop');
 const UserSchema = new mongoose.Schema({
 	username: String,
 	password: String,
-	google_access_token: String,
-	google_refresh_token: String,
-	facebook_access_token: String,
-	facebook_manager_id: String,
 	shops: [ShopSchema]
 }, { strict: false });
 

@@ -10,7 +10,6 @@ const ShopSchema = new mongoose.Schema({
 	google_refresh_token: String,
 	facebook_access_token: String,
 	facebook_refresh_token: String,
-	google_campaigns: [GoogleCampaignSchema],
 	google_client: GoogleClientSchema,
 	facebook_business: FacebookBusinessSchema
 }, { strict: false });
