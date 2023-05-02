@@ -1,15 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 const session = require('express-session');
 const passport = require('passport');
-const port = process.env.PORT || 8080;
+const connect = require('./utils/connect');
 const authRoutes = require('./routes/auth');
 const shopifyRoutes = require('./routes/shopify');
 const googleRoutes = require('./routes/google');
 const facebookRoutes = require('./routes/facebook');
 
+const port = process.env.PORT || 8080;
 const app = express();
 
 const whitelist = [
@@ -31,7 +31,7 @@ const corsOptions = {
 		else if (whitelist.indexOf(origin) !== -1) {
 			callback(null, true)
 		} else {
-			console.log("CORS error from origin", origin)
+			console.log('CORS error from origin', origin);
 			callback(new Error('Not allowed by CORS'))
 		}
 	}
@@ -53,7 +53,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
 	corsOptions.req = req;
 	next();
-})
+});
 app.use(cors(corsOptions));
 app.use('/', authRoutes);
 app.use('/', shopifyRoutes);
@@ -62,9 +62,7 @@ app.use('/', facebookRoutes);
 
 app.set('trust proxy', 1);
 
-mongoose.set('strictQuery', true); //warning suppression
-mongoose.connect(process.env.DB_CONNECT)
-	.then(() => console.log("connected to database"))
-	.catch(error => console.log(error));
-
-app.listen(port, () => console.log('Server running on port %d', port));
+app.listen(port, () => {
+	console.log('Server running on port %d', port);
+	connect();
+});

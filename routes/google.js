@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { User } = require('../models/User');
-const { encrypt, decrypt, getToken } = require('../helpers/crypto');
+const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const { google } = require('googleapis');
 const { GoogleAdsApi } = require('google-ads-api');
 const { differenceInDays, parseISO } = require('date-fns');

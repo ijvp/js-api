@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const passport = require('passport');
-const { decrypt } = require('../helpers/crypto');
-const getCurrentUser = require('../helpers/currentUser');
+const { decrypt } = require('../utils/crypto');
+const getCurrentUser = require('../utils/currentUser');
 const { User } = require('../models/User');
 
 passport.use(User.createStrategy());

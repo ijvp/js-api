@@ -1,8 +1,8 @@
 const router = require('express').Router();
 const axios = require('axios');
 const { User } = require('../models/User');
-const { encrypt, decrypt, getToken } = require('../helpers/crypto');
-const { getStoreApiURL, getMetrics, extractHttpsUrl } = require('../helpers/shop');
+const { encrypt, decrypt, getToken } = require('../utils/crypto');
+const { getStoreApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
 const moment = require('moment');
 
 const localState = 'n159-uimp02430u18r4bnty3920b1y382458';
