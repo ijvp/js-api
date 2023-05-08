@@ -167,15 +167,15 @@ router.get("/facebook/account/disconnect", checkAuth, async (req, res) => {
 // O startDate e o endDate tem que ser enviados no padrão yyyy-mm-dd
 router.post("/facebook/ads", checkAuth, async (req, res) => {
   const { store, start, end } = req.body;
-
-  if (!(store && start && end)) {
-    return res.status(400).json({ success: false, message: 'Invalid request body' });
+  if (!store) {
+    return res.status(400).send('Invalid request body, missing store')
   }
 
-  let userData = req.user;
+  if (!start && !end) {
+    return res.status(400).send('Start date and end date must be set');
+  }
 
-  let shop = await userData.shops.find((shop) => shop.name === store);
-
+  let shop = await req.user.shops.find((shop) => shop.name === store);
   if (!shop) {
     return res.status(404).send("Store not found")
   }

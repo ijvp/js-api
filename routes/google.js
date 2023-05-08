@@ -197,17 +197,20 @@ router.post("/google/accounts/manager", checkAuth, async (req, res) => {
 });
 
 router.post("/google/ads", checkAuth, async (req, res) => {
-  const { startDate, endDate, store } = req.body;
+  const { start, end, store } = req.body;
   if (!store) {
     return res.status(400).send('Invalid request body, missing store')
   }
-  if (!startDate && !endDate) {
+
+  if (!start && !end) {
     return res.status(400).send('Start date and end date must be set');
   }
+
   let shop = await req.user.shops.find((shop) => shop.name === store);
   if (!shop) {
     return res.status(404).send('Store not found');
   }
+
   if (!shop.google_client) {
     return res.status(404).send('No client associated with this store');
   }
@@ -218,13 +221,13 @@ router.post("/google/ads", checkAuth, async (req, res) => {
       }`,
   });
 
-  const isSingleDay = differenceInDays(parseISO(String(endDate)), parseISO(String(startDate)));
-  const start = startDate.split("T")[0];
-  const end = endDate.split("T")[0];
+  const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start)));
+  const startDate = start.split("T")[0];
+  const endDate = end.split("T")[0];
 
   await account.report({
-    from_date: start,
-    to_date: end,
+    from_date: startDate,
+    to_date: endDate,
     segments: isSingleDay === 0 ? ["segments.hour"] : ["segments.date"],
     entity: "campaign",
     attributes: [
@@ -245,7 +248,7 @@ router.post("/google/ads", checkAuth, async (req, res) => {
         let dateKey;
         if (!isSingleDay) {
           const campaignHour = ad.segments.hour < 10 ? `0${ad.segments.hour}` : `${ad.segments.hour}`;
-          const utcDate = new Date(Date.parse(startDate));
+          const utcDate = new Date(Date.parse(start));
           const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60 * 1000));
           const localDateTime = new Date(`${localDate.toISOString().substring(0, 10)}T${campaignHour}:00:00`);
           dateKey = localDateTime.toISOString();
