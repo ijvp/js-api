@@ -31,6 +31,10 @@ const getStoreApiURL = (store) => {
 	return `https://${store}/admin/api/${process.env.SHOPIFY_API_VERSION}`;
 };
 
+const getStoreFrontApiURL = (store) => {
+	return `https://${store}/api/${process.env.SHOPIFY_API_VERSION}`;
+}
+
 //sempre retorna a proxima pagina do header da shopify, se nao retorna nulo
 //é possivel que precise refatorar isso depois caso rel="previous" torne se
 //util
@@ -47,4 +51,4 @@ function extractHttpsUrl(linkHeader) {
 	return false;
 }
 
-module.exports = { getMetrics, getStoreAccessToken, getStoreApiURL, extractHttpsUrl };
+module.exports = { getMetrics, getStoreAccessToken, getStoreFrontApiURL, getStoreApiURL, extractHttpsUrl };

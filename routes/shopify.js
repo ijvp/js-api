@@ -3,7 +3,7 @@ const axios = require('axios');
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { getStoreApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
+const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
 const { checkAuth } = require('../utils/user');
 
 const localState = 'n159-uimp02430u18r4bnty3920b1y382458';
@@ -61,8 +61,10 @@ router.get('/shopify/callback', checkAuth, (req, res, next) => {
 						return shop.name === req.query.shop;
 					});
 					const encryptedToken = encrypt(res.data.access_token)
+					//const encryptedStoreToken = encrypt(res.data.store_token)
 					if (shopIndex >= 0) {
 						user.shops[shopIndex].shopify_access_token = encryptedToken;
+						//user.shops[shopIndex].shopify_store_token = encryptedStoreToken
 					} else {
 						user.shops.push({
 							name: req.query.shop,
@@ -195,5 +197,93 @@ router.post('/shopify/abandoned-checkouts', checkAuth, (req, res) => {
 
 	fetchAbandonedCheckouts();
 });
+
+router.get('/shopify/most-wanted', checkAuth, (req, res) => {
+	const { store } = req.body;
+	if (!store) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
+	};
+
+	const shopifyStoreToken = getToken(req, 'shopify', 'store');
+	const token = decrypt(shopifyStoreToken);
+
+	const query = `
+		{
+			products(first: 10, sortKey: BEST_SELLING) {
+				edges {
+					node {
+						id
+						title
+					}
+				}
+			}
+		}
+		`;
+
+	axios({
+	url: `${getStoreFrontApiURL(store)}/graphql.json`,
+	method: 'post',
+	headers: {
+		'Content-Type': 'application/json',
+		'X-Shopify-Storefront-Access-Token': ''
+	},
+	data: JSON.stringify({
+		query: query
+	})
+	}).then((response) => {
+			if(response.data.errors) {
+				return res.status(500).send({ success: false, message: response.data.errors })
+			} else {
+				return res.status(200).send(response.data.data.products.edges)
+			}
+	}).catch((error) => {
+		logger.error(error);
+      	return res.status(500).json({ success: false, message: 'Internal server error' });
+	})
+})
+
+// router.get('/shopify/most-wanted', checkAuth, (req, res) => {
+// 	const { store } = req.body;
+// 	if (!store) {
+// 		return res.status(400).json({ success: false, message: 'Invalid request body' })
+// 	};
+
+// 	const shopifyAccessToken = getToken(req, 'shopify');
+// 	const token = decrypt(shopifyAccessToken);
+
+// 	const query = `
+//   {
+//     products(first: 10, sortKey: BEST_SELLING) {
+//       edges {
+//         node {
+//           id
+//           title
+//         }
+//       }
+//     }
+//   }
+// `;
+
+// axios({
+//   url: `https://${store}/api/2021-07/graphql.json`,
+//   method: 'post',
+//   headers: {
+//     'Content-Type': 'application/json',
+//     'X-Shopify-Storefront-Access-Token': 'bb3fb36041547c22164a495df12ceabf'
+//   },
+//   data: JSON.stringify({
+//     query: query
+//   })
+// }).then((response) => {
+// 		if(response.data.errors) {
+// 			return res.status(500).send(response.data.errors)
+// 		} else {
+// 			return res.status(200).send(response.data.data.products.edges)
+// 		}
+// 	}).catch((error) => {
+// 		logger.error(error);
+//       	return res.status(500).json({ success: false, message: 'Internal server error' });
+// 	})
+// })
 
 module.exports = router;
