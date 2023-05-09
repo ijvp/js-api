@@ -250,7 +250,7 @@ router.get('/shopify/most-wanted', checkAuth, (req, res) => {
 		}
 	}).catch((error) => {
 		logger.error(error);
-      	return res.status(500).json({ success: false, message: 'Internal server error' });
+      		return res.status(500).json({ success: false, message: 'Internal server error' });
 	})
 })
 
