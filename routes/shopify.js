@@ -43,9 +43,7 @@ router.post('/shopify/connect', checkAuth, (req, res) => {
 					shopify_storefront_token: encryptedStoreToken
 				});
 			} else {
-				storeExists.name = store,
-				storeExists.shopify_access_token = encryptedToken,
-				storeExists.shopify_storefront_token = encryptedStoreToken
+				return res.status(409).json({ success: false, message: 'Shop already exists' });
 			}
 			
 			user.markModified("shops");
