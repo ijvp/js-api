@@ -136,45 +136,35 @@ router.get('/google/account/disconnect', checkAuth, async (req, res) => {
 
 //Gets all Google Ads account associated with authorized Google account
 router.get('/google/accounts', checkAuth, async (req, res) => {
-  const encryptedToken = getToken(req, 'google', 'refresh');
-  const token = decrypt(encryptedToken);
-  if (!token) {
-    return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
+  try {
+    const encryptedToken = getToken(req, 'google', 'refresh');
+    const token = decrypt(encryptedToken);
+
+    if (!token) {
+      return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
+    }
+
+    const customerResourceNames = await client.listAccessibleCustomers(token).then(response => response.resource_names);
+
+    const managerIdList = await Promise.all(customerResourceNames.map(async (resourceName) => {
+      const customerId = resourceName.split('customers/')[1];
+      const accountList = client.Customer({
+        customer_id: customerId,
+        refresh_token: token,
+      });
+      const response = await accountList.report({
+        entity: 'customer_client',
+        attributes: ['customer_client.id', 'customer_client.resource_name', 'customer_client.descriptive_name'],
+      });
+      return response.filter(account => account.customer_client.id.toString() === customerId)[0].customer_client;
+    }));
+
+    res.status(200).json(managerIdList);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
-
-  const customers = client.listAccessibleCustomers(token).then(response => {
-    return response.resource_names;
-  }).catch(error => {
-    logger.error(error.details);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
-  });
-
-  const managerIdList = [];
-  const promises = customers.map(async (resourceName) => {
-    const customerId = `${resourceName.split('customers/')[1]}`;
-    const accountList = client.Customer({
-      customer_id: customerId,
-      refresh_token: `${token}`,
-    });
-    accountList.report({
-      entity: 'customer_client',
-      attributes: ['customer_client.id', 'customer_client.resource_name', 'customer_client.descriptive_name'],
-    }).then(response => {
-      response.map((account) => {
-        if (account.customer_client.id.toString() === customerId) {
-          managerIdList.push(account.customer_client);
-        }
-      })
-    }).catch(error => {
-      logger.error(error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
-    });
-  })
-
-  await Promise.all(promises);
-
-  res.status(200).json(managerIdList)
-})
+});
 
 //Save google_manager_id to req.user
 router.post("/google/accounts/manager", checkAuth, async (req, res) => {
