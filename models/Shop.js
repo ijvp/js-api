@@ -6,6 +6,7 @@ const { GoogleClientSchema } = require('./GoogleClient');
 const ShopSchema = new mongoose.Schema({
 	name: String,
 	shopify_access_token: String,
+	shopify_storefront_token: String,
 	google_access_token: String,
 	google_refresh_token: String,
 	facebook_access_token: String,

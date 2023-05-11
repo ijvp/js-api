@@ -3,7 +3,7 @@ const axios = require('axios');
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { getStoreApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
+const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
 const { checkAuth } = require('../utils/user');
 
 const localState = 'n159-uimp02430u18r4bnty3920b1y382458';
@@ -22,7 +22,7 @@ router.get('/shopify/authorize', (req, res) => {
 //this endpoint is used by the custom app architecture where
 //an individual app must be created for each store inside the Shopify Admin panel
 router.post('/shopify/connect', checkAuth, (req, res) => {
-	const { store, access_token } = req.body;
+	const { store, access_token, storefront_token } = req.body;
 
 	if (!(store && access_token)) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
@@ -31,11 +31,21 @@ router.post('/shopify/connect', checkAuth, (req, res) => {
 	User.findById(req.user._id)
 		.then(user => {
 			if (!user.shops) user.shops = [];
+
+			const storeExists = user.shops.find((shop) => shop.name === store);
 			const encryptedToken = encrypt(access_token);
-			user.shops.push({
-				name: store,
-				shopify_access_token: encryptedToken
-			});
+			const encryptedStoreToken = encrypt(storefront_token);
+
+			if(!storeExists) {
+				user.shops.push({
+					name: store,
+					shopify_access_token: encryptedToken,
+					shopify_storefront_token: encryptedStoreToken
+				});
+			} else {
+				return res.status(409).json({ success: false, message: 'Shop already exists' });
+			}
+			
 			user.markModified("shops");
 			user.save(err => {
 				if (err) {
@@ -61,8 +71,10 @@ router.get('/shopify/callback', checkAuth, (req, res, next) => {
 						return shop.name === req.query.shop;
 					});
 					const encryptedToken = encrypt(res.data.access_token)
+					//const encryptedStoreToken = encrypt(res.data.store_token)
 					if (shopIndex >= 0) {
 						user.shops[shopIndex].shopify_access_token = encryptedToken;
+						//user.shops[shopIndex].shopify_store_token = encryptedStoreToken
 					} else {
 						user.shops.push({
 							name: req.query.shop,
@@ -195,5 +207,49 @@ router.post('/shopify/abandoned-checkouts', checkAuth, (req, res) => {
 
 	fetchAbandonedCheckouts();
 });
+
+router.get('/shopify/most-wanted', checkAuth, (req, res) => {
+	const { store } = req.body;
+	if (!store) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
+	};
+
+	const shopifyStoreToken = getToken(req, 'shopify', 'storefront');
+	const token = decrypt(shopifyStoreToken);
+
+	const query = `
+		{
+			products(first: 10, sortKey: BEST_SELLING) {
+				edges {
+					node {
+						id
+						title
+					}
+				}
+			}
+		}
+		`;
+
+	axios({
+		url: `${getStoreFrontApiURL(store)}/graphql.json`,
+		method: 'post',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-Shopify-Storefront-Access-Token': token
+		},
+		data: JSON.stringify({
+			query: query
+		})
+	}).then((response) => {
+		if(response.data.errors) {
+			return res.status(500).send({ success: false, message: response.data.errors })
+		} else {
+			return res.status(200).send(response.data.data.products.edges)
+		}
+	}).catch((error) => {
+		logger.error(error);
+      		return res.status(500).json({ success: false, message: 'Internal server error' });
+	})
+})
 
 module.exports = router;
