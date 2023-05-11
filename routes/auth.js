@@ -58,6 +58,52 @@ router.post('/auth/login', (req, res) => {
 	});
 });
 
+router.post('/auth/update', checkAuth, async (req, res) => {
+	const { username, password, newPassword } = req.body;
+
+	if (!(username && password)) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' });
+	};
+
+	const user = await User.findById(req.user._id);
+	if (!user) {
+		return res.status(404).json({ success: false, message: 'User not found' });
+	}
+
+	if (username !== user.username) {
+		user.username = username;
+		try {
+			await user.save();
+		} catch (error) {
+			logger.error(error);
+			return res.status(500).json({ success: false, message: 'Something went wrong' });
+		};
+	};
+
+	if (newPassword) {
+		if (newPassword === password) {
+			return res.status(400).json({ success: false, message: 'New password cannot be the same as previous password' });
+		};
+
+		return user.changePassword(password, newPassword)
+			.then(() => {
+				return res.status(200).json({ success: true, message: 'User updated successfully' });
+			})
+			.catch(error => {
+				logger.error(error);
+				return res.status(500).json({ success: false, message: 'Internal server error' });
+			})
+
+		try {
+			user.changePassword(password, newPassword);
+			return res.status(200).json({ success: true, message: 'User updated successfully' });
+		} catch (error) {
+			logger.error(error);
+			return res.status(500).json({ success: false, message: 'Internal server error' });
+		}
+	};
+});
+
 router.get('/auth/logout', checkAuth, (req, res, next) => {
 	req.logout(err => {
 		if (err) {
