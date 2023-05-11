@@ -92,15 +92,7 @@ router.post('/auth/update', checkAuth, async (req, res) => {
 			.catch(error => {
 				logger.error(error);
 				return res.status(500).json({ success: false, message: 'Internal server error' });
-			})
-
-		try {
-			user.changePassword(password, newPassword);
-			return res.status(200).json({ success: true, message: 'User updated successfully' });
-		} catch (error) {
-			logger.error(error);
-			return res.status(500).json({ success: false, message: 'Internal server error' });
-		}
+			});
 	};
 });
 
