@@ -11,7 +11,6 @@ const { SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } = process.env;
 const scope = 'read_orders,read_customers,read_all_orders';
 
 //TODO: how to create a reusable axios instance here if the shop name always comes as a request parameter?
-
 router.get('/shopify/authorize', (req, res) => {
 	const redirectUri = `${process.env.BACKEND_URL}/shopify/callback`;
 	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}&state=${localState}`);
@@ -36,7 +35,7 @@ router.post('/shopify/connect', checkAuth, (req, res) => {
 			const encryptedToken = encrypt(access_token);
 			const encryptedStoreToken = encrypt(storefront_token);
 
-			if(!storeExists) {
+			if (!storeExists) {
 				user.shops.push({
 					name: store,
 					shopify_access_token: encryptedToken,
@@ -45,7 +44,7 @@ router.post('/shopify/connect', checkAuth, (req, res) => {
 			} else {
 				return res.status(409).json({ success: false, message: 'Shop already exists' });
 			}
-			
+
 			user.markModified("shops");
 			user.save(err => {
 				if (err) {
@@ -114,12 +113,11 @@ router.post('/shopify/orders', checkAuth, (req, res) => {
 	}
 
 	//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
-	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
 	let allOrders = [];
 	let ordersEndpoint = `${getStoreApiURL(store)}/orders.json`;
 	let params = {
-		created_at_min: start,
-		created_at_max: endIncremented,
+		created_at_min: new Date(start),
+		created_at_max: new Date(end),
 		financial_status: 'paid',
 		status: 'any',
 		limit: 250
@@ -241,14 +239,14 @@ router.get('/shopify/most-wanted', checkAuth, (req, res) => {
 			query: query
 		})
 	}).then((response) => {
-		if(response.data.errors) {
+		if (response.data.errors) {
 			return res.status(500).send({ success: false, message: response.data.errors })
 		} else {
 			return res.status(200).send(response.data.data.products.edges)
 		}
 	}).catch((error) => {
 		logger.error(error);
-      		return res.status(500).json({ success: false, message: 'Internal server error' });
+		return res.status(500).json({ success: false, message: 'Internal server error' });
 	})
 })
 
