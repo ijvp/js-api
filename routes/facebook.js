@@ -54,7 +54,7 @@ router.get("/facebook/callback", async (req, res) => {
 
       return user;
     }).then(() => {
-      res.redirect(`${process.env.FRONTEND_URL}/summary?facebook_authorized=true&facebook_authorized_store=${state}`);
+      res.redirect(`${process.env.FRONTEND_URL}/summary?platform=facebook&store=${state}`);
     }).catch((error) => {
       return res.status(400).send(error);
     })
@@ -181,7 +181,7 @@ router.post("/facebook/ads", checkAuth, async (req, res) => {
   }
 
   if (!shop.facebook_business) {
-    res.status(404).send("No facebook business associated with this store");
+    return res.status(404).send("No facebook business associated with this store");
   }
 
   const campaign = {

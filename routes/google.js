@@ -69,7 +69,7 @@ router.get('/google/callback', (req, res) => {
         })
         .catch(err => logger.error(err));
 
-      res.redirect(`${process.env.FRONTEND_URL}/summary?google_authorized=true&google_authorized_store=${state}`);
+      res.redirect(`${process.env.FRONTEND_URL}/summary?platform=google&store=${state}`);
     };
   });
 });
@@ -241,7 +241,7 @@ router.post("/google/ads", checkAuth, async (req, res) => {
           const utcDate = new Date(Date.parse(start));
           const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60 * 1000));
           const localDateTime = new Date(`${localDate.toISOString().substring(0, 10)}T${campaignHour}:00:00`);
-          dateKey = localDateTime.toISOString();
+          dateKey = localDateTime.toISOString().slice(0, -11);
         } else {
           dateKey = ad.segments.date;
         }
