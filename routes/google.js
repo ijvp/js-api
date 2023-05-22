@@ -69,13 +69,14 @@ router.get('/google/callback', (req, res) => {
         })
         .catch(err => logger.error(err));
 
-      res.redirect(`${process.env.FRONTEND_URL}/summary?platform=google&store=${state}`);
+      res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${state}`);
     };
   });
 });
 
 //Connect a google account to one of the users shops
 router.post("/google/account/connect", checkAuth, (req, res) => {
+  console.log('/google/account/connect', req.body)
   const { client, store } = req.body;
   if (!(client && store)) {
     return res.status(400).send({ success: false, message: 'Invalid request body' });
@@ -108,6 +109,7 @@ router.post("/google/account/connect", checkAuth, (req, res) => {
 
 //Disconnects google account from a user's shop
 router.get('/google/account/disconnect', checkAuth, async (req, res) => {
+  console.log('/google/account/disconnect', req.query)
   const { store } = req.query;
 
   if (!store) {
@@ -152,11 +154,19 @@ router.get('/google/accounts', checkAuth, async (req, res) => {
         customer_id: customerId,
         refresh_token: token,
       });
-      const response = await accountList.report({
-        entity: 'customer_client',
-        attributes: ['customer_client.id', 'customer_client.resource_name', 'customer_client.descriptive_name'],
-      });
-      return response.filter(account => account.customer_client.id.toString() === customerId)[0].customer_client;
+
+      try {
+        const response = await accountList.report({
+          entity: 'customer_client',
+          attributes: ['customer_client.id', 'customer_client.resource_name', 'customer_client.descriptive_name'],
+        });
+
+        return response.filter(account => account.customer_client.id.toString() === customerId)[0].customer_client;
+
+      } catch (error) {
+        return 'error'
+      }
+      
     }));
 
     res.status(200).json(managerIdList);
