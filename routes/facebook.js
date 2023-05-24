@@ -42,7 +42,7 @@ router.get("/facebook/callback", async (req, res) => {
       const accessToken = encrypt(response.data.access_token);
 
       if (shopIndex < 0) {
-        console.log("shop not found for this user");
+        logger.error("shop not found for this user");
       } else {
         user.shops[shopIndex].facebook_access_token = accessToken;
         user.facebook_manager_id = clientId;

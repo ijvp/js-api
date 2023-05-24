@@ -76,7 +76,6 @@ router.get('/google/callback', (req, res) => {
 
 //Connect a google account to one of the users shops
 router.post("/google/account/connect", checkAuth, (req, res) => {
-  console.log('/google/account/connect', req.body)
   const { client, store } = req.body;
   if (!(client && store)) {
     return res.status(400).send({ success: false, message: 'Invalid request body' });
@@ -109,7 +108,6 @@ router.post("/google/account/connect", checkAuth, (req, res) => {
 
 //Disconnects google account from a user's shop
 router.get('/google/account/disconnect', checkAuth, async (req, res) => {
-  console.log('/google/account/disconnect', req.query)
   const { store } = req.query;
 
   if (!store) {
@@ -166,7 +164,7 @@ router.get('/google/accounts', checkAuth, async (req, res) => {
       } catch (error) {
         return 'error'
       }
-      
+
     }));
 
     res.status(200).json(managerIdList);
