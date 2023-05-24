@@ -42,7 +42,7 @@ router.post('/shopify/connect', checkAuth, (req, res) => {
 					shopify_storefront_token: encryptedStoreToken
 				});
 			} else {
-				return res.status(409).json({ success: false, message: 'Shop already exists' });
+				return res.status(409).json({ success: false, message: 'Store already connected' });
 			}
 
 			user.markModified("shops");
@@ -51,7 +51,7 @@ router.post('/shopify/connect', checkAuth, (req, res) => {
 					logger.error(err);
 					return res.status(500).json({ success: false, message: 'Internal server error' });
 				} else {
-					res.status(201).json({ success: true, message: 'Store connected to account' });
+					res.status(201).json({ success: true, message: 'Store connected to account', store });
 				}
 			})
 		});
