@@ -54,7 +54,7 @@ router.get("/facebook/callback", checkAuth, async (req, res) => {
 
       return user;
     }).then(() => {
-      res.redirect(`${process.env.FRONTEND_URL}/summary?platform=facebook&store=${state}`);
+      res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=facebook&store=${state}`);
     }).catch((error) => {
       return res.status(400).send(error);
     })
@@ -109,9 +109,9 @@ router.get("/facebook/accounts", checkAuth, async (req, res) => {
 //     }
 // ]
 router.post("/facebook/account/connect", checkAuth, async (req, res) => {
-  const { business, store } = req.body;
+  const { account, store } = req.body;
 
-  if (!(business && store)) {
+  if (!(account && store)) {
     return res.status(400).json({ success: false, message: 'Invalid request body' });
   }
 
@@ -122,15 +122,15 @@ router.post("/facebook/account/connect", checkAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Store not found' })
     } else {
       shop.facebook_business = {
-        business_id: business.account_id,
-        business_name: business.name
+        id: account.id,
+        name: account.name
       };
       user.markModified("shops");
       user.save(err => err && logger.error(err))
     };
 
     res.status(201).json({
-      success: true, message: `Facebook business ${business.name} added to ${store}`
+      success: true, message: `Facebook business ${account.name} added to ${store}`
     });
   })
 

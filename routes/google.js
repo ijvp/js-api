@@ -76,8 +76,8 @@ router.get('/google/callback', checkAuth, (req, res) => {
 
 //Connect a google account to one of the users shops
 router.post("/google/account/connect", checkAuth, (req, res) => {
-  const { client, store } = req.body;
-  if (!(client && store)) {
+  const { account, store } = req.body;
+  if (!(account && store)) {
     return res.status(400).send({ success: false, message: 'Invalid request body' });
   }
 
@@ -88,8 +88,8 @@ router.post("/google/account/connect", checkAuth, (req, res) => {
       return res.status(404).json({ success: false, message: `Store ${store} not found` });
     } else {
       shop.google_client = {
-        client_id: client.id,
-        client_name: client.descriptive_name
+        id: account.id,
+        name: account.name
       };
       user.markModified("shops");
       user.save(err => {
@@ -98,7 +98,7 @@ router.post("/google/account/connect", checkAuth, (req, res) => {
           return res.status(500).json({ success: false, message: 'Internal server error' });
         } else {
           res.status(201).json({
-            success: true, message: `Google Ads account ${client.descriptive_name} added to ${store}`
+            success: true, message: `Google Ads account ${account.name} added to ${store}`
           });
         }
       });
@@ -214,7 +214,7 @@ router.post("/google/ads", checkAuth, async (req, res) => {
   }
 
   const account = client.Customer({
-    customer_id: `${shop.google_client.client_id}`,
+    customer_id: `${shop.google_client.id}`,
     refresh_token: `${decrypt(shop.google_refresh_token)
       }`,
   });

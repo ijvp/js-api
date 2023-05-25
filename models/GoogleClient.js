@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
 const GoogleClientSchema = new mongoose.Schema({
-	client_id: String,
-	client_name: String,
+	id: String,
+	name: String,
 })
 
 const GoogleClient = mongoose.model('GoogleClient', GoogleClientSchema);
