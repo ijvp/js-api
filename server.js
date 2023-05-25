@@ -49,6 +49,7 @@ app.use(session({
 	resave: false,
 	saveUninitialized: false,
 	cookie: {
+		domain: process.env.NODE_ENV === 'production' ? 'turbopartners.com.br',
 		secure: process.env.NODE_ENV === 'production',
 		sameSite: 'lax'
 		// sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'none'
