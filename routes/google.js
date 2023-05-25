@@ -23,7 +23,7 @@ const client = new GoogleAdsApi({
 
 //Generate google oAuth url and send it back to the client
 //and send the selected store in state variable
-router.get('/google/authorize', async (req, res) => {
+router.get('/google/authorize', checkAuth, async (req, res) => {
   const { store } = req.query;
   if (!store) {
     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
@@ -44,7 +44,7 @@ router.get('/google/authorize', async (req, res) => {
 
 //Associate access and refresh tokens to a store, which is sent
 //back in the state
-router.get('/google/callback', (req, res) => {
+router.get('/google/callback', checkAuth, (req, res) => {
   const { code, state } = req.query;
 
   oauth2Client.getToken(code, async (error, token) => {

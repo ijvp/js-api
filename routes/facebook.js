@@ -7,7 +7,7 @@ const axios = require('axios');
 const { differenceInDays, parseISO } = require('date-fns');
 
 //Login facebook, quando usuário finalizar login chama a rota callback
-router.get("/facebook/authorize", async (req, res) => {
+router.get("/facebook/authorize", checkAuth, async (req, res) => {
   const { store } = req.query;
   if (!store) {
     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
@@ -17,7 +17,7 @@ router.get("/facebook/authorize", async (req, res) => {
 
 
 //Callback, usa o "code" que veio na requisição da rota de login(connect) para buscar o access token do usuário, com o access token buscamos o id do usuário. O access token e o id são salvos no banco de dados.
-router.get("/facebook/callback", async (req, res) => {
+router.get("/facebook/callback", checkAuth, async (req, res) => {
   const { code, state } = req.query;
   await axios({
     method: 'get',
