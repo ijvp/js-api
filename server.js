@@ -22,6 +22,7 @@ const corsOptions = {
 	origin: function (origin, callback) {
 		//TODO: test this line and other corsOption.req middleware
 		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
+		logger.info(typeof origin, origin, origin?.length);
 		if (forwardedHost === process.env.FRONTEND_URL) {
 			callback(null, true);
 		}
@@ -32,8 +33,7 @@ const corsOptions = {
 		else if (whitelist.indexOf(origin) !== -1) {
 			callback(null, true)
 		} else {
-			logger.error('CORS error from origin', origin);
-			callback(new Error('Not allowed by CORS'))
+			callback(new Error('Not allowed by CORS', origin))
 		}
 	}
 };
