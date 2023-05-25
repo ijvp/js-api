@@ -68,8 +68,9 @@ app.use('/', shopifyRoutes);
 app.use('/', googleRoutes);
 app.use('/', facebookRoutes);
 
-// Tell express to allow nginx
-app.set('trust proxy', 1);
+// Tell express to allow nginx address directly next to app
+// which points to the aws production load balancer
+app.set('trust proxy', process.env.NODE_ENV === "production" ? 1 : 0);
 
 app.listen(port, () => {
 	logger.info('Server running on port %d', port);
