@@ -22,7 +22,9 @@ const corsOptions = {
 	origin: function (origin, callback) {
 		//TODO: test this line and other corsOption.req middleware
 		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
-		logger.info(typeof origin, origin, origin?.length);
+		logger.info(`typeof ${typeof origin}`);
+		logger.info(`origin ${origin}`);
+		logger.info(`node_env ${process.env.NODE_ENV}`◊);
 		if (forwardedHost === process.env.FRONTEND_URL) {
 			callback(null, true);
 		}
