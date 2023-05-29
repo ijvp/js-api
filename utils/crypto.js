@@ -18,7 +18,17 @@ const getToken = (req, platform, type = "access") => {
 	}
 
 	const selectedToken = `${platform}_${type}_token`;
-	return req.user.shops.find(shop => shop.name === store)[selectedToken];
+	const found = req.user.shops.find(shop => shop.name === store);
+	if (!found) {
+		throw new Error("Store not found")
+	};
+
+	const foundToken = found[selectedToken]
+	if (!foundToken) {
+		throw new Error("Token type does not exist for this store")
+	}
+
+	return foundToken;
 }
 
 module.exports = { encrypt, decrypt, getToken };
