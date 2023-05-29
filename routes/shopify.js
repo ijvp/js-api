@@ -111,7 +111,6 @@ router.post('/shopify/orders', checkAuth, (req, res) => {
 	if (!token) {
 		return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
 	}
-
 	//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
 	let allOrders = [];
 	let ordersEndpoint = `${getStoreApiURL(store)}/orders.json`;
@@ -139,7 +138,7 @@ router.post('/shopify/orders', checkAuth, (req, res) => {
 					params = undefined; //must clear original query parameters otherwise new endpoint will return 400
 					fetchOrders(); // Call the function recursively to continue fetching orders
 				} else {
-					res.status(200).json({
+					return res.status(200).json({
 						id: 'shopify.order-metrics',
 						metricsBreakdown: getMetrics(allOrders, granularity)
 					});
@@ -147,7 +146,7 @@ router.post('/shopify/orders', checkAuth, (req, res) => {
 			})
 			.catch(error => {
 				logger.error(error);
-				res.status(500).json({ sucess: false, message: 'Internal server error' });
+				return res.status(500).json({ sucess: false, message: 'Internal server error' });
 			});
 	};
 

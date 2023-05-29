@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
 const FacebookBusinessSchema = new mongoose.Schema({
-	business_id: String,
-	business_name: String,
+	id: String,
+	name: String,
 })
 
 const FacebookBusiness = mongoose.model('FacebookBusiness', FacebookBusinessSchema);
