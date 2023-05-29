@@ -51,8 +51,7 @@ app.use(session({
 	cookie: {
 		domain: process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "",
 		secure: process.env.NODE_ENV === 'production',
-		// sameSite: 'lax'
-		sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'none'
+		sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
 	}
 }));
 
