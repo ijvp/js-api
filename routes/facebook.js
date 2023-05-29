@@ -88,14 +88,26 @@ router.get("/facebook/accounts", checkAuth, async (req, res) => {
         url = accounts.paging.next;
       }
 
+      allAccounts.sort((a, b) => {
+        const nameA = a.name.toUpperCase();
+        const nameB = b.name.toUpperCase();
+
+        if (nameA < nameB) {
+          return -1;
+        } else if (nameA > nameB) {
+          return 1;
+        } else {
+          return 0;
+        }
+      });
+
       return res.status(200).json(allAccounts);
     } catch (error) {
       logger.error(error);
       return res.status(500).json({ success: false, message: 'Internal server error' });
     }
   })
-})
-
+});
 
 //Rota para buscar as contas que serão mostradas no dashboard
 //Essa rota pode salvar várias contas facebook para lojas diferentes, o shopName serve para a rota buscar o shop correspondente.
@@ -126,15 +138,20 @@ router.post("/facebook/account/connect", checkAuth, async (req, res) => {
         name: account.name
       };
       user.markModified("shops");
-      user.save(err => err && logger.error(err))
+      user.save(err => {
+        if (err) {
+          logger.error(err);
+          return res.status(500).json({ success: false, message: 'Internal server error' });
+        } else {
+          res.status(201).json({
+            success: true, message: `Facebook business account ${account.name} added to ${store}`
+          });
+        }
+      });
     };
-
-    res.status(201).json({
-      success: true, message: `Facebook business ${account.name} added to ${store}`
-    });
   })
 
-})
+});
 
 router.get("/facebook/account/disconnect", checkAuth, async (req, res) => {
   const { store } = req.query;
@@ -193,7 +210,7 @@ router.post("/facebook/ads", checkAuth, async (req, res) => {
   const since = start.split("T")[0];
   const until = end.split("T")[0];
 
-  let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/act_${shop.facebook_business.business_id}/insights`;
+  let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${shop.facebook_business.id}/insights`;
   let params = {
     time_range: { since, until },
     level: "account",
@@ -229,7 +246,7 @@ router.post("/facebook/ads", checkAuth, async (req, res) => {
       url = response.data.paging?.next;
     } while (url);
   } catch (error) {
-    logger.error(error.response.data);
+    logger.error(error.response.data.error.message);
     return res.status(500).json({ success: false, message: 'Internal server error' })
   }
 

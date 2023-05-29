@@ -146,7 +146,7 @@ router.get('/google/accounts', checkAuth, async (req, res) => {
 
     const customerResourceNames = await client.listAccessibleCustomers(token).then(response => response.resource_names);
 
-    const managerIdList = await Promise.all(customerResourceNames.map(async (resourceName) => {
+    const allAccounts = await Promise.all(customerResourceNames.map(async (resourceName) => {
       const customerId = resourceName.split('customers/')[1];
       const accountList = client.Customer({
         customer_id: customerId,
@@ -167,7 +167,20 @@ router.get('/google/accounts', checkAuth, async (req, res) => {
 
     }));
 
-    res.status(200).json(managerIdList);
+    allAccounts.sort((a, b) => {
+      const nameA = a.descriptive_name.toUpperCase();
+      const nameB = b.descriptive_name.toUpperCase();
+
+      if (nameA < nameB) {
+        return -1;
+      } else if (nameA > nameB) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+
+    res.status(200).json(allAccounts);
   } catch (error) {
     logger.error(error);
     res.status(500).json({ success: false, message: 'Internal server error' });
