@@ -205,7 +205,7 @@ router.post('/shopify/abandoned-checkouts', checkAuth, (req, res) => {
 	fetchAbandonedCheckouts();
 });
 
-router.get('/shopify/most-wanted', checkAuth, (req, res) => {
+router.post('/shopify/most-wanted', checkAuth, (req, res) => {
 	const { store } = req.body;
 	if (!store) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
@@ -242,6 +242,63 @@ router.get('/shopify/most-wanted', checkAuth, (req, res) => {
 			return res.status(500).send({ success: false, message: response.data.errors })
 		} else {
 			return res.status(200).send(response.data.data.products.edges)
+		}
+	}).catch((error) => {
+		logger.error(error);
+		return res.status(500).json({ success: false, message: 'Internal server error' });
+	})
+});
+
+router.post('/shopify/product', checkAuth, (req, res) => {
+	const { store, productId } = req.body;
+	if (!productId) {
+		return res.status(400).json({ success: false, message: 'Invalid request body, missing product id' })
+	};
+
+	const shopifyStoreToken = getToken(req, 'shopify', 'storefront');
+	const token = decrypt(shopifyStoreToken);
+
+	const query = `
+  query getProduct($productId: ID!) {
+    product(id: $productId) {
+      id
+      title
+      description
+      featuredImage {
+        altText
+        url
+        width
+        height
+      }
+			priceRange {
+				maxVariantPrice {
+					amount
+				}
+				minVariantPrice {
+					amount
+				}
+			}
+      onlineStoreUrl
+    }
+  }
+`;
+
+	axios({
+		url: `${getStoreFrontApiURL(store)}/graphql.json`,
+		method: 'post',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-Shopify-Storefront-Access-Token': token
+		},
+		data: JSON.stringify({
+			query: query,
+			variables: { productId: productId }
+		})
+	}).then((response) => {
+		if (response.data.errors) {
+			return res.status(500).send({ success: false, message: response.data.errors })
+		} else {
+			return res.status(200).send(response.data.data.product)
 		}
 	}).catch((error) => {
 		logger.error(error);
