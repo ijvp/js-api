@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth');
 const shopifyRoutes = require('./routes/shopify');
 const googleRoutes = require('./routes/google');
 const facebookRoutes = require('./routes/facebook');
+const MongoStore = require('connect-mongo');
 
 const port = process.env.PORT || 8080;
 const app = express();
@@ -45,6 +46,14 @@ app.use(cors(corsOptions));
 
 // Session middleware
 app.use(session({
+	store: MongoStore.create(
+		{
+			mongoUrl: process.env.DB_CONNECT,
+			crypto: {
+				secret: process.env.DB_SECRET
+			}
+		}
+	),
 	secret: process.env.SESSION_SECRET,
 	resave: false,
 	saveUninitialized: false,
