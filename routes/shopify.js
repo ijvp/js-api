@@ -5,16 +5,50 @@ const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
 const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
 const { checkAuth } = require('../utils/user');
+const shopify = require('../om/shopifyClient');
+
 
 const localState = 'n159-uimp02430u18r4bnty3920b1y382458';
 const { SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } = process.env;
 const scope = 'read_orders,read_customers,read_all_orders';
 
 //TODO: how to create a reusable axios instance here if the shop name always comes as a request parameter?
-router.get('/shopify/authorize', (req, res) => {
-	const redirectUri = `${process.env.BACKEND_URL}/shopify/callback`;
-	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}&state=${localState}`);
-	res.redirect(authorizationUrl);
+// router.get('/shopify/authorize', (req, res) => {
+// 	const redirectUri = `${process.env.BACKEND_URL}/shopify/callback`;
+// 	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}&state=${localState}`);
+// 	res.redirect(authorizationUrl);
+// });
+router.get('/shopify/auth', async (req, res) => {
+	try {
+		await shopify.auth.begin({
+			shop: shopify.utils.sanitizeShop(req.query.shop, true),
+			callbackPath: '/shopify/auth/callback',
+			isOnline: true,
+			rawRequest: req,
+			rawResponse: res
+		})
+	} catch (error) {
+		logger.error(error);
+	}
+});
+
+router.get('/shopify/auth/callback', async (req, res) => {
+	const callback = await shopify.auth.callback({
+		rawRequest: req,
+		rawResponse: res
+	});
+
+	res.redirect(process.env.FRONTEND_URL);
+});
+
+router.get('/shopify/session', async (req, res) => {
+	const sessionId = await shopify.session.getCurrentId({
+		isOnline: true,
+		rawRequest: req,
+		rawResponse: res
+	});
+
+	res.send(sessionId);
 });
 
 //accepts store url and access token, and saves to current user

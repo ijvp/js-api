@@ -1,5 +1,6 @@
 // packages
 require('dotenv').config();
+require('@shopify/shopify-api/adapters/node');
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
@@ -111,5 +112,5 @@ app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : 0);
 
 app.listen(port, () => {
 	logger.info('Server running on port %d', port);
-	connect();
+	// connect();
 });
