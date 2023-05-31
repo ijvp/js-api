@@ -1,15 +1,21 @@
+// packages
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
-const connect = require('./utils/connect');
-const logger = require('./utils/logger');
+const redis = require('redis');
+const RedisStore = require('connect-redis').default;
+
+// routes
 const authRoutes = require('./routes/auth');
 const shopifyRoutes = require('./routes/shopify');
 const googleRoutes = require('./routes/google');
 const facebookRoutes = require('./routes/facebook');
-const MongoStore = require('connect-mongo');
+
+// utils
+const connect = require('./utils/connect');
+const logger = require('./utils/logger');
 
 const port = process.env.PORT || 8080;
 const app = express();
@@ -37,7 +43,6 @@ const corsOptions = {
 		}
 	}
 };
-
 app.use((req, res, next) => {
 	corsOptions.req = req;
 	next();
@@ -45,24 +50,46 @@ app.use((req, res, next) => {
 app.use(cors(corsOptions));
 
 // Session middleware
+const redisClient = redis.createClient({
+	url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
+});
+redisClient.connect().catch(logger.error)
+redisClient.on('error', err => logger.error(`Redis Client Error ${error}`));
+
+const redisStore = new RedisStore({
+	client: redisClient,
+	prefix: 'sharkboard'
+});
+
 app.use(session({
-	store: MongoStore.create(
-		{
-			mongoUrl: process.env.DB_CONNECT,
-			crypto: {
-				secret: process.env.DB_SECRET
-			}
-		}
-	),
+	store: redisStore,
 	secret: process.env.SESSION_SECRET,
-	resave: false,
 	saveUninitialized: false,
+	resave: false,
 	cookie: {
 		domain: process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "",
 		secure: process.env.NODE_ENV === 'production',
 		sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
 	}
 }));
+// app.use(session({
+// 	store: MongoStore.create(
+// 		{
+// 			mongoUrl: process.env.DB_CONNECT,
+// 			crypto: {
+// 				secret: process.env.DB_SECRET
+// 			}
+// 		}
+// 	),
+// 	secret: process.env.SESSION_SECRET,
+// 	resave: false,
+// 	saveUninitialized: false,
+// 	cookie: {
+// 		domain: process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "",
+// 		secure: process.env.NODE_ENV === 'production',
+// 		sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+// 	}
+// }));
 
 // Passport middleware
 app.use(passport.initialize());
