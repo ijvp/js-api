@@ -1,151 +1,69 @@
 const router = require('express').Router();
 const axios = require('axios');
 const { User } = require('../models/User');
-const { encrypt, decrypt, getToken } = require('../utils/crypto');
+const { decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl } = require('../utils/shop');
-const { checkAuth } = require('../utils/user');
+const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl, getSessionFromStorage } = require('../utils/shop');
+const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const shopify = require('../om/shopifyClient');
+const { redisClient } = require('../om/redisClient');
 
+router.get(shopify.config.auth.path, shopify.auth.begin());
 
-const localState = 'n159-uimp02430u18r4bnty3920b1y382458';
-const { SHOPIFY_CLIENT_ID, SHOPIFY_CLIENT_SECRET } = process.env;
-const scope = 'read_orders,read_customers,read_all_orders';
-
-//TODO: how to create a reusable axios instance here if the shop name always comes as a request parameter?
-// router.get('/shopify/authorize', (req, res) => {
-// 	const redirectUri = `${process.env.BACKEND_URL}/shopify/callback`;
-// 	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${SHOPIFY_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}&state=${localState}`);
-// 	res.redirect(authorizationUrl);
-// });
-router.get('/shopify/auth', async (req, res) => {
-	try {
-		await shopify.auth.begin({
-			shop: shopify.utils.sanitizeShop(req.query.shop, true),
-			callbackPath: '/shopify/auth/callback',
-			isOnline: true,
-			rawRequest: req,
-			rawResponse: res
-		})
-	} catch (error) {
-		logger.error(error);
+router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), (req, res) => {
+	const { shop } = res.locals.shopify.session;
+	if (req.user) {
+		const userId = req.user._id;
+		redisClient.sAdd(`user_stores:${userId}`, shop)
+			.then(() => {
+				logger.info(`Store '${shop}' added to user_stores set for user with ID '${userId}'`);
+				res.redirect('/shopify/session');
+			})
+			.catch(error => {
+				logger.error(error);
+				return res.status(500).json({ error: 'Internal Server Error' });
+			})
 	}
 });
 
-router.get('/shopify/auth/callback', async (req, res) => {
-	const callback = await shopify.auth.callback({
-		rawRequest: req,
-		rawResponse: res
-	});
-
-	res.redirect(process.env.FRONTEND_URL);
-});
-
 router.get('/shopify/session', async (req, res) => {
-	const sessionId = await shopify.session.getCurrentId({
+	const sessionId = await shopify.api.session.getCurrentId({
 		isOnline: true,
 		rawRequest: req,
 		rawResponse: res
 	});
 
-	res.send(sessionId);
-});
-
-//accepts store url and access token, and saves to current user
-//this endpoint is used by the custom app architecture where
-//an individual app must be created for each store inside the Shopify Admin panel
-router.post('/shopify/connect', checkAuth, (req, res) => {
-	const { store, access_token, storefront_token } = req.body;
-
-	if (!(store && access_token)) {
-		return res.status(400).json({ success: false, message: 'Invalid request body' })
-	}
-
-	User.findById(req.user._id)
-		.then(user => {
-			if (!user.shops) user.shops = [];
-
-			const storeExists = user.shops.find((shop) => shop.name === store);
-			const encryptedToken = encrypt(access_token);
-			const encryptedStoreToken = encrypt(storefront_token);
-
-			if (!storeExists) {
-				user.shops.push({
-					name: store,
-					shopify_access_token: encryptedToken,
-					shopify_storefront_token: encryptedStoreToken
-				});
-			} else {
-				return res.status(409).json({ success: false, message: 'Store already connected' });
-			}
-
-			user.markModified("shops");
-			user.save(err => {
-				if (err) {
-					logger.error(err);
-					return res.status(500).json({ success: false, message: 'Internal server error' });
-				} else {
-					res.status(201).json({ success: true, message: 'Store connected to account', store });
-				}
-			})
-		});
-});
-
-router.get('/shopify/callback', checkAuth, (req, res, next) => {
-	const { code, hmac, state, shop } = req.query;
-
-	//TODO: hmac, state, shop-regex security checks
-	if (state === localState) {
-		axios.post(`https://${shop}/admin/oauth/access_token?client_id=${SHOPIFY_CLIENT_ID}&client_secret=${SHOPIFY_CLIENT_SECRET}&code=${code}`)
-			.then(res => User.findOne({ _id: req.user._id })
-				.then(user => {
-					if (!user.shops) user.shops = [];
-					const shopIndex = user.shops.findIndex(shop => {
-						return shop.name === req.query.shop;
-					});
-					const encryptedToken = encrypt(res.data.access_token)
-					//const encryptedStoreToken = encrypt(res.data.store_token)
-					if (shopIndex >= 0) {
-						user.shops[shopIndex].shopify_access_token = encryptedToken;
-						//user.shops[shopIndex].shopify_store_token = encryptedStoreToken
-					} else {
-						user.shops.push({
-							name: req.query.shop,
-							shopify_access_token: encryptedToken
-						});
-					}
-					//Does not update access token without this line
-					//TODO: further investigate diff between find() ==> save() and findOneAndUpdate()
-					user.markModified("shops");
-					user.save(err => {
-						if (err) logger.error(err);
-					})
-				})
-			)
-			.catch(err => logger.error(err));
-
-		res.redirect(process.env.FRONTEND_URL);
-	} else {
-		logger.warn("Security check failed for callback!")
-		res.status(401).send('Security check failed, check state, hmac, or shop parameter');
-	}
+	res.json({ shopify, sessionId });
 });
 
 //currently only returns paid orders
 //parameters: store: String, start (Date), end (Date), granularity: 'day' | 'hour',
 //triplewhale additional parameters: match? [], metricsBreakdown: boolean, shopId (shop.name)
-router.post('/shopify/orders', checkAuth, (req, res) => {
+router.post('/shopify/orders', checkAuth, checkStoreExistence, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
+
 	if (!(store && start && granularity)) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	const shopifyAccessToken = getToken(req, 'shopify');
-	const token = decrypt(shopifyAccessToken);
-	if (!token) {
-		return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
-	}
+	// const shopifyAccessToken = getToken(req, 'shopify');
+	// const token = decrypt(shopifyAccessToken);
+	// if (!token) {
+	// 	return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
+	// }
 	//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
+	const storeSession = await getSessionFromStorage(store);
+	const token = storeSession.accessToken;
+
+	const orders = await shopify.api.rest.Order.all({
+		session: storeSession,
+		created_at_min: start,
+		created_at_max: end
+	});
+
+	return res.json(orders);
+
+
 	let allOrders = [];
 	let ordersEndpoint = `${getStoreApiURL(store)}/orders.json`;
 	let params = {
@@ -187,18 +105,23 @@ router.post('/shopify/orders', checkAuth, (req, res) => {
 	fetchOrders();
 });
 
-router.post('/shopify/abandoned-checkouts', checkAuth, (req, res) => {
+router.post('/shopify/abandoned-checkouts', checkAuth, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
 
 	if (!(store && start && granularity)) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	const shopifyAccessToken = getToken(req, 'shopify');
-	const token = decrypt(shopifyAccessToken);
-	if (!token) {
-		return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
-	}
+	const storeSession = await getSessionFromStorage(store);
+	const token = storeSession.accessToken;
+
+	const abandonedCheckouts = await shopify.api.rest.AbandonedCheckout.checkouts({
+		session: storeSession,
+		created_at_min: start,
+		created_at_max: end
+	});
+
+	return res.json(abandonedCheckouts);
 
 	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
 	let allAbandonedCheckouts = [];
@@ -239,14 +162,14 @@ router.post('/shopify/abandoned-checkouts', checkAuth, (req, res) => {
 	fetchAbandonedCheckouts();
 });
 
-router.post('/shopify/most-wanted', checkAuth, (req, res) => {
+router.post('/shopify/most-wanted', checkAuth, async (req, res) => {
 	const { store } = req.body;
 	if (!store) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	const shopifyStoreToken = getToken(req, 'shopify', 'storefront');
-	const token = decrypt(shopifyStoreToken);
+	const storeSession = await getSessionFromStorage(store);
+	const token = storeSession.accessToken;
 
 	const query = `
 		{
@@ -283,15 +206,21 @@ router.post('/shopify/most-wanted', checkAuth, (req, res) => {
 	})
 });
 
-router.post('/shopify/product', checkAuth, (req, res) => {
+router.post('/shopify/product', checkAuth, async (req, res) => {
 	const { store, productId } = req.body;
 	if (!productId) {
 		return res.status(400).json({ success: false, message: 'Invalid request body, missing product id' })
 	};
 
-	const shopifyStoreToken = getToken(req, 'shopify', 'storefront');
-	const token = decrypt(shopifyStoreToken);
+	const storeSession = await getSessionFromStorage(store);
+	const token = storeSession.accessToken;
 
+	const product = await shopify.api.rest.Product.find({
+		session: storeSession,
+		id: productId
+	});
+
+	return res.json(product);
 	const query = `
   query getProduct($productId: ID!) {
     product(id: $productId) {

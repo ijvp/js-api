@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { User } = require('../models/User');
 const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { checkAuth } = require('../utils/user');
+const { checkAuth } = require('../utils/middleware');
 const axios = require('axios');
 const { differenceInDays, parseISO } = require('date-fns');
 

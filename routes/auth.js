@@ -2,7 +2,8 @@ const router = require('express').Router();
 const passport = require('passport');
 const { decrypt } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { checkAuth, getCurrentUser } = require('../utils/user');
+const { getCurrentUser } = require('../utils/user');
+const { checkAuth } = require('../utils/middleware');
 const { User } = require('../models/User');
 
 passport.use(User.createStrategy());

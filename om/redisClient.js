@@ -1,5 +1,18 @@
-import { Client } from 'redis-om';
+const redis = require('redis');
+const RedisStore = require('connect-redis').default;
+const logger = require('../utils/logger');
 
-const client = await new Client().open(process.env.REDIS_URL);
+// Session middleware
+const redisClient = redis.createClient({
+	url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
+});
 
-export default client;
+redisClient.connect().catch(logger.error)
+redisClient.on('error', err => logger.error(`Redis Client Error ${err}`));
+
+const redisStore = new RedisStore({
+	client: redisClient,
+	prefix: 'sessions:'
+});
+
+module.exports = { redisClient, redisStore };

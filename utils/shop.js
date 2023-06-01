@@ -1,4 +1,7 @@
 const Decimal = require('decimal.js');
+const { redisClient } = require("../om/redisClient");
+const shopify = require("../om/shopifyClient");
+const logger = require('../utils/logger');
 
 const getMetrics = (items, granularity) => {
 	const metrics = new Map();
@@ -33,12 +36,12 @@ const getStoreApiURL = (store) => {
 
 const getStoreFrontApiURL = (store) => {
 	return `https://${store}/api/${process.env.SHOPIFY_API_VERSION}`;
-}
+};
 
 //sempre retorna a proxima pagina do header da shopify, se nao retorna nulo
 //é possivel que precise refatorar isso depois caso rel="previous" torne se
 //util
-function extractHttpsUrl(linkHeader) {
+const extractHttpsUrl = (linkHeader) => {
 	if (linkHeader) {
 		const links = linkHeader.split(' ');
 		const url = links[0].slice(1, -2);
@@ -49,6 +52,31 @@ function extractHttpsUrl(linkHeader) {
 	}
 
 	return false;
-}
+};
 
-module.exports = { getMetrics, getStoreAccessToken, getStoreFrontApiURL, getStoreApiURL, extractHttpsUrl };
+const arrayToObject = (arr) => {
+	const result = {};
+	for (const [key, value] of arr) {
+		result[key] = value;
+	}
+
+	return result;
+};
+
+const getSessionFromStorage = async (sessionId) => {
+	try {
+		const session = await redisClient.get(`${shopify.config.sessionStorage.options.sessionKeyPrefix}_offline_${sessionId}`);
+		return arrayToObject(JSON.parse(session));
+	} catch (error) {
+		logger.error(error);
+	};
+};
+
+module.exports = {
+	getMetrics,
+	getStoreAccessToken,
+	getStoreFrontApiURL,
+	getStoreApiURL,
+	extractHttpsUrl,
+	getSessionFromStorage
+};
