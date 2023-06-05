@@ -18,7 +18,7 @@ const checkStoreExistence = (req, res, next) => {
 			if (!result) {
 				return res.status(404).json({ success: false, error: "Store not found" })
 			};
-			2
+
 			next();
 		})
 		.catch(err => {

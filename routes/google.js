@@ -1,8 +1,7 @@
 const router = require('express').Router();
 const { User } = require('../models/User');
-const { encrypt, decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { checkAuth } = require('../utils/middleware');
+const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const { google } = require('googleapis');
 const { GoogleAdsApi } = require('google-ads-api');
 const { differenceInDays, parseISO } = require('date-fns');
@@ -53,107 +52,79 @@ router.get('/google/callback', checkAuth, (req, res) => {
       return res.status(400).send(`Error while trying to retrieve access token: ${error}`);
     } else {
       try {
-        await redisClient.hSet(`store:${shop}`, google_access_token, token.access_token);
-        await redisClient.hSet(`store:${shop}`, google_refresh_token, token.refresh_token);
-        res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${state}`);
+        await redisClient.hSet(`store:${shop}`, 'google_access_token', token.access_token);
+        await redisClient.hSet(`store:${shop}`, 'google_refresh_token', token.refresh_token);
+        return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${shop}`);
       } catch (error) {
         logger.error(error);
         return res.status(500).json({ success: false, message: "Internal Server Error" })
       }
-
-      // User.findOne({ _id: req.user._id })
-      //   .then(user => {
-      //     const shopIndex = user.shops.findIndex(shop => shop.name === state);
-      //     const accessToken = encrypt(token.access_token);
-      //     const refreshToken = encrypt(token.refresh_token);
-      //     if (shopIndex < 0) {
-      //       logger.info("No stores associated with this user")
-      //     } else {
-      //       user.shops[shopIndex].google_access_token = accessToken;
-      //       user.shops[shopIndex].google_refresh_token = refreshToken;
-      //       user.markModified("shops");
-      //       user.save(err => {
-      //         if (err) logger.error(err);
-      //       });
-      //     }
-      //   })
-      //   .catch(err => logger.error(err));
     };
   });
 });
 
 //Connect a google account to one of the users shops
-router.post("/google/account/connect", checkAuth, (req, res) => {
-  const { account, store } = req.body;
-  if (!(account && store)) {
+router.post("/google/account/connect", checkAuth, checkStoreExistence, async (req, res) => {
+  const { account } = req.body;
+  if (!(account)) {
     return res.status(400).send({ success: false, message: 'Invalid request body' });
   }
 
-  User.findById(req.user._id).then(user => {
-    const shop = user.shops.find((shop) => shop.name === store);
+  try {
+    const userId = req.user._id;
+    const userStores = await redisClient.sMembers(`user_stores:${userId}`);
+    const found = userStores.find(store => store === store);
+    if (found) {
+      await redisClient.hSet(`store:${store}`, 'google_id', account.id);
+      await redisClient.hSet(`store:${store}`, 'google_name', account.name);
 
-    if (!shop) {
-      return res.status(404).json({ success: false, message: `Store ${store} not found` });
-    } else {
-      shop.google_client = {
-        id: account.id,
-        name: account.name
-      };
-      user.markModified("shops");
-      user.save(err => {
-        if (err) {
-          logger.error(err);
-          return res.status(500).json({ success: false, message: 'Internal server error' });
-        } else {
-          res.status(201).json({
-            success: true, message: `Google Ads account ${account.name} added to ${store}`
-          });
-        }
+      return res.status(201).json({
+        success: true, message: `Google Ads account ${account.name} added to ${store}`
       });
+    } else {
+      return res.status(404).json({ success: false, error: "Store not found" })
     }
-  });
+
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });
 
 //Disconnects google account from a user's shop
-router.get('/google/account/disconnect', checkAuth, async (req, res) => {
-  const { store } = req.query;
+router.get('/google/account/disconnect', checkAuth, checkStoreExistence, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userStores = await redisClient.sMembers(`user_stores:${userId}`);
+    const found = userStores.find(store => store === store);
+    if (found) {
+      await redisClient.hDel(`store:${store}`, 'google_id');
+      await redisClient.hDel(`store:${store}`, 'google_name');
 
-  if (!store) {
-    return res.status(400).json({ success: false, message: 'Invalid request query' })
-  }
-  User.findOneAndUpdate(
-    { _id: req.user._id, "shops.name": store },
-    {
-      $unset: {
-        "shops.$.google_client": 1,
-        "shops.$.google_access_token": 1,
-        "shops.$.google_refresh_token": 1
-      },
-    },
-    { new: true },
-    (err) => {
-      if (err) {
-        logger.error(err);
-        return res.status(500).json({ success: false, message: 'Internal server error' });
-      } else {
-        res.status(204).json({ success: true, message: `Removed Google Ads account from ${store}` });
-      }
-    }
-  );
+      return res.status(201).json({
+        success: true, message: `Google Ads account disconnected from ${store}`
+      });
+    } else {
+      return res.status(404).json({ success: false, error: "Store not found" })
+    };
+
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  };
 });
 
 //Gets all Google Ads account associated with authorized Google account
-router.get('/google/accounts', checkAuth, async (req, res) => {
+router.get('/google/accounts', checkAuth, checkStoreExistence, async (req, res) => {
   try {
-    const encryptedToken = getToken(req, 'google', 'refresh');
-    const token = decrypt(encryptedToken);
+    const { store } = req.query;
+    const token = await redisClient.hGet(`store:${store}`, 'google_refresh_token')
 
     if (!token) {
       return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
     }
 
     const customerResourceNames = await client.listAccessibleCustomers(token).then(response => response.resource_names);
-
     const allAccounts = await Promise.all(customerResourceNames.map(async (resourceName) => {
       const customerId = resourceName.split('customers/')[1];
       const accountList = client.Customer({
@@ -168,11 +139,9 @@ router.get('/google/accounts', checkAuth, async (req, res) => {
         });
 
         return response.filter(account => account.customer_client.id.toString() === customerId)[0].customer_client;
-
       } catch (error) {
         return 'error'
       }
-
     }));
 
     allAccounts.sort((a, b) => {
@@ -188,6 +157,7 @@ router.get('/google/accounts', checkAuth, async (req, res) => {
       }
     });
 
+    logger.info(allAccounts);
     res.status(200).json(allAccounts);
   } catch (error) {
     logger.error(error);
@@ -215,87 +185,80 @@ router.post("/google/accounts/manager", checkAuth, async (req, res) => {
   })
 });
 
-router.post("/google/ads", checkAuth, async (req, res) => {
+router.post("/google/ads", checkAuth, checkStoreExistence, async (req, res) => {
   const { start, end, store } = req.body;
-  if (!store) {
-    return res.status(400).send('Invalid request body, missing store')
-  }
 
   if (!start && !end) {
     return res.status(400).send('Start date and end date must be set');
-  }
+  };
 
-  let shop = await req.user.shops.find((shop) => shop.name === store);
-  if (!shop) {
-    return res.status(404).send('Store not found');
-  }
+  try {
+    const { google_refresh_token: token, google_id: googleId } = await redisClient.hGetAll(`store:${store}`, 'google_refresh_token');
+    if (!googleId) {
+      return res.status(404).send('No Google Ads account associated with this store');
+    };
 
-  if (!shop.google_client) {
-    return res.status(404).send('No client associated with this store');
-  }
-
-  const account = client.Customer({
-    customer_id: `${shop.google_client.id}`,
-    refresh_token: `${decrypt(shop.google_refresh_token)
-      }`,
-  });
-
-  const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start)));
-  const startDate = start.split("T")[0];
-  const endDate = end.split("T")[0];
-
-  await account.report({
-    from_date: startDate,
-    to_date: endDate,
-    segments: isSingleDay === 0 ? ["segments.hour"] : ["segments.date"],
-    entity: "campaign",
-    attributes: [
-      "campaign.id",
-      "campaign.name"
-    ],
-    metrics: [
-      "metrics.cost_micros"
-    ]
-  })
-    .then(data => {
-      let metrics = {
-        id: "google-ads.ads-metrics",
-        metricsBreakdown: []
-      }
-
-      data.forEach(ad => {
-        let dateKey;
-        if (!isSingleDay) {
-          const campaignHour = ad.segments.hour < 10 ? `0${ad.segments.hour}` : `${ad.segments.hour}`;
-          const utcDate = new Date(Date.parse(start));
-          const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60 * 1000));
-          const localDateTime = new Date(`${localDate.toISOString().substring(0, 10)}T${campaignHour}:00:00`);
-          dateKey = localDateTime.toISOString().slice(0, -11);
-        } else {
-          dateKey = ad.segments.date;
-        }
-
-        const dateExists = metrics.metricsBreakdown.find((byDate) => byDate.date === dateKey);
-
-        if (dateExists) {
-          dateExists.metrics.spend += ad.metrics.cost_micros / 1000000;
-        } else {
-          const dayDate = {
-            date: dateKey,
-            metrics: {
-              spend: ad.metrics.cost_micros / 1000000
-            }
-          }
-          metrics.metricsBreakdown.push(dayDate);
-        }
-      })
-
-      return res.status(200).json(metrics);
-    })
-    .catch(error => {
-      logger.error(error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+    const account = client.Customer({
+      customer_id: googleId,
+      refresh_token: token,
     });
+
+    const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start)));
+    const startDate = start.split("T")[0];
+    const endDate = end.split("T")[0];
+
+    await account.report({
+      from_date: startDate,
+      to_date: endDate,
+      segments: isSingleDay === 0 ? ["segments.hour"] : ["segments.date"],
+      entity: "campaign",
+      attributes: [
+        "campaign.id",
+        "campaign.name"
+      ],
+      metrics: [
+        "metrics.cost_micros"
+      ]
+    })
+      .then(data => {
+        let metrics = {
+          id: "google-ads.ads-metrics",
+          metricsBreakdown: []
+        }
+
+        data.forEach(ad => {
+          let dateKey;
+          if (!isSingleDay) {
+            const campaignHour = ad.segments.hour < 10 ? `0${ad.segments.hour}` : `${ad.segments.hour}`;
+            const utcDate = new Date(Date.parse(start));
+            const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60 * 1000));
+            const localDateTime = new Date(`${localDate.toISOString().substring(0, 10)}T${campaignHour}:00:00`);
+            dateKey = localDateTime.toISOString().slice(0, -11);
+          } else {
+            dateKey = ad.segments.date;
+          }
+
+          const dateExists = metrics.metricsBreakdown.find((byDate) => byDate.date === dateKey);
+
+          if (dateExists) {
+            dateExists.metrics.spend += ad.metrics.cost_micros / 1000000;
+          } else {
+            const dayDate = {
+              date: dateKey,
+              metrics: {
+                spend: ad.metrics.cost_micros / 1000000
+              }
+            }
+            metrics.metricsBreakdown.push(dayDate);
+          }
+        });
+
+        return res.status(200).json(metrics);
+      })
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  };
 });
 
 module.exports = router;

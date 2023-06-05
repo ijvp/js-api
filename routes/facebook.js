@@ -1,10 +1,11 @@
 const router = require('express').Router();
 const { User } = require('../models/User');
-const { encrypt, decrypt, getToken } = require('../utils/crypto');
+const { decrypt } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { checkAuth } = require('../utils/middleware');
+const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const axios = require('axios');
 const { differenceInDays, parseISO } = require('date-fns');
+const { redisClient } = require('../om/redisClient');
 
 //Login facebook, quando usuário finalizar login chama a rota callback
 router.get("/facebook/authorize", checkAuth, async (req, res) => {
@@ -15,98 +16,75 @@ router.get("/facebook/authorize", checkAuth, async (req, res) => {
   return res.status(200).json(`https://www.facebook.com/${process.env.FACEBOOK_API_VERSION}/dialog/oauth?client_id=${process.env.FACEBOOK_API_CLIENT_ID}&redirect_uri=${process.env.FACEBOOK_API_REDIRECT_URL}&scope=${process.env.FACEBOOK_API_SCOPES}&state=${store}`)
 });
 
-
 //Callback, usa o "code" que veio na requisição da rota de login(connect) para buscar o access token do usuário, com o access token buscamos o id do usuário. O access token e o id são salvos no banco de dados.
 router.get("/facebook/callback", checkAuth, async (req, res) => {
-  const { code, state } = req.query;
+  const { code, state: shop } = req.query;
   await axios({
     method: 'get',
     url: `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/oauth/access_token?redirect_uri=${process.env.FACEBOOK_API_REDIRECT_URL}&client_id=${process.env.FACEBOOK_API_CLIENT_ID}&client_secret=${process.env.FACEBOOK_API_CLIENT_SECRET}&code=${code}`
-  }).then(async response => {
-
-    const clientId = await axios({
-      method: "get",
-      url: `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/me?fields=id&access_token=${response.data.access_token}`
-    }).then(response => {
-      return response.data.id;
-    }).catch(error => {
-      if (error.response) {
-        return res.status(400).send(error.response.data.error);
-      } else {
-        return res.status(400).send(error);
-      }
-    });
-
-    await User.findOne({ _id: req.user._id }).then(user => {
-      const shopIndex = user.shops.findIndex(shop => shop.name === state);
-      const accessToken = encrypt(response.data.access_token);
-
-      if (shopIndex < 0) {
-        logger.error("shop not found for this user");
-      } else {
-        user.shops[shopIndex].facebook_access_token = accessToken;
-        user.facebook_manager_id = clientId;
-        user.markModified("shops");
-        user.save(err => {
-          if (err) logger.error(err);
+  })
+    .then(async response => {
+      const clientId = await axios({
+        method: "get",
+        url: `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/me?fields=id&access_token=${response.data.access_token}`
+      })
+        .then(response => response.data.id)
+        .catch(error => {
+          if (error.response) {
+            return res.status(400).send(error.response.data.error);
+          } else {
+            return res.status(400).send(error);
+          }
         });
-      }
 
-      return user;
-    }).then(() => {
-      res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=facebook&store=${state}`);
-    }).catch((error) => {
-      return res.status(400).send(error);
-    })
-  }).catch(error => {
-    if (error.response) {
-      return res.status(400).send(error.response.data.error);
-    } else {
-      return res.status(400).send(error);
-    }
-  });
+      try {
+        await redisClient.hSet(`store:${shop}`, 'fb_access_token', response.data.acess_token);
+        return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=facebook&store=${shop}`);
+      } catch (error) {
+        logger.error(error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+      };
+    });
 });
 
 
 //Rota para buscar as contas administradas pelo usuário que fez o login, usamos o facebook_access_token do usuário logado para fazer a busca.
-router.get("/facebook/accounts", checkAuth, async (req, res) => {
-  const encryptedToken = getToken(req, 'facebook', 'access');
-  const token = decrypt(encryptedToken);
-  if (!token) {
-    return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
-  }
+router.get("/facebook/accounts", checkAuth, checkStoreExistence, async (req, res) => {
+  try {
+    const { store } = req.query;
+    const token = await redisClient.hGet(`store:${store}`, 'fb_token');
 
-  User.findById(req.user._id).then(async user => {
-    try {
-      let allAccounts = [];
-
-      let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/me/adaccounts?fields=name%2Cid%2Caccount_id&access_token=${token}`;
-
-      while (url) {
-        const { data: accounts } = await axios.get(url);
-        allAccounts = allAccounts.concat(accounts.data);
-        url = accounts.paging.next;
-      }
-
-      allAccounts.sort((a, b) => {
-        const nameA = a.name.toUpperCase();
-        const nameB = b.name.toUpperCase();
-
-        if (nameA < nameB) {
-          return -1;
-        } else if (nameA > nameB) {
-          return 1;
-        } else {
-          return 0;
-        }
-      });
-
-      return res.status(200).json(allAccounts);
-    } catch (error) {
-      logger.error(error);
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+    if (!token) {
+      return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
     }
-  })
+
+    let allAccounts = [];
+    let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/me/adaccounts?fields=name%2Cid%2Caccount_id&access_token=${token}`;
+
+    while (url) {
+      const { data: accounts } = await axios.get(url);
+      allAccounts = allAccounts.concat(accounts.data);
+      url = accounts.paging.next;
+    }
+
+    allAccounts.sort((a, b) => {
+      const nameA = a.name.toUpperCase();
+      const nameB = b.name.toUpperCase();
+
+      if (nameA < nameB) {
+        return -1;
+      } else if (nameA > nameB) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+
+    return res.status(200).json(allAccounts);
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  };
 });
 
 //Rota para buscar as contas que serão mostradas no dashboard
@@ -120,7 +98,7 @@ router.get("/facebook/accounts", checkAuth, async (req, res) => {
 //         "account_id": account id na loja no facebook,
 //     }
 // ]
-router.post("/facebook/account/connect", checkAuth, async (req, res) => {
+router.post("/facebook/account/connect", checkAuth, checkStoreExistence, async (req, res) => {
   const { account, store } = req.body;
 
   if (!(account && store)) {
@@ -153,7 +131,7 @@ router.post("/facebook/account/connect", checkAuth, async (req, res) => {
 
 });
 
-router.get("/facebook/account/disconnect", checkAuth, async (req, res) => {
+router.get("/facebook/account/disconnect", checkAuth, checkStoreExistence, async (req, res) => {
   const { store } = req.query;
 
   if (!store) {
