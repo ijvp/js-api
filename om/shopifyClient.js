@@ -18,7 +18,7 @@ const shopify = shopifyApp({
 		callbackPath: '/shopify/auth/callback'
 	},
 	webhooks: {
-		path: '/api/webhooks'
+		path: '/shopify/webhooks'
 	},
 	sessionStorage: new RedisSessionStorage(
 		process.env.REDIS_URL,

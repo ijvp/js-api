@@ -14,6 +14,7 @@ const authRoutes = require('./routes/auth');
 const shopifyRoutes = require('./routes/shopify');
 const googleRoutes = require('./routes/google');
 const facebookRoutes = require('./routes/facebook');
+const userRoutes = require('./routes/user');
 
 // utils
 const connect = require('./utils/connect');
@@ -76,6 +77,7 @@ app.use('/', authRoutes);
 app.use('/', shopifyRoutes);
 app.use('/', googleRoutes);
 app.use('/', facebookRoutes);
+app.use('/', userRoutes);
 
 // Tell express to allow nginx address directly next to app
 // which points to the aws production load balancer

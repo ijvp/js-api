@@ -6,6 +6,7 @@ const { checkAuth } = require('../utils/middleware');
 const { google } = require('googleapis');
 const { GoogleAdsApi } = require('google-ads-api');
 const { differenceInDays, parseISO } = require('date-fns');
+const { redisClient } = require('../om/redisClient');
 
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URL, TOKEN_GOOGLE } = process.env;
 
@@ -45,31 +46,38 @@ router.get('/google/authorize', checkAuth, async (req, res) => {
 //Associate access and refresh tokens to a store, which is sent
 //back in the state
 router.get('/google/callback', checkAuth, (req, res) => {
-  const { code, state } = req.query;
+  const { code, state: shop } = req.query;
 
   oauth2Client.getToken(code, async (error, token) => {
     if (error) {
       return res.status(400).send(`Error while trying to retrieve access token: ${error}`);
     } else {
-      User.findOne({ _id: req.user._id })
-        .then(user => {
-          const shopIndex = user.shops.findIndex(shop => shop.name === state);
-          const accessToken = encrypt(token.access_token);
-          const refreshToken = encrypt(token.refresh_token);
-          if (shopIndex < 0) {
-            logger.info("No stores associated with this user")
-          } else {
-            user.shops[shopIndex].google_access_token = accessToken;
-            user.shops[shopIndex].google_refresh_token = refreshToken;
-            user.markModified("shops");
-            user.save(err => {
-              if (err) logger.error(err);
-            });
-          }
-        })
-        .catch(err => logger.error(err));
+      try {
+        await redisClient.hSet(`store:${shop}`, google_access_token, token.access_token);
+        await redisClient.hSet(`store:${shop}`, google_refresh_token, token.refresh_token);
+        res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${state}`);
+      } catch (error) {
+        logger.error(error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" })
+      }
 
-      res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${state}`);
+      // User.findOne({ _id: req.user._id })
+      //   .then(user => {
+      //     const shopIndex = user.shops.findIndex(shop => shop.name === state);
+      //     const accessToken = encrypt(token.access_token);
+      //     const refreshToken = encrypt(token.refresh_token);
+      //     if (shopIndex < 0) {
+      //       logger.info("No stores associated with this user")
+      //     } else {
+      //       user.shops[shopIndex].google_access_token = accessToken;
+      //       user.shops[shopIndex].google_refresh_token = refreshToken;
+      //       user.markModified("shops");
+      //       user.save(err => {
+      //         if (err) logger.error(err);
+      //       });
+      //     }
+      //   })
+      //   .catch(err => logger.error(err));
     };
   });
 });

@@ -1,6 +1,5 @@
 const router = require('express').Router();
 const passport = require('passport');
-const { decrypt } = require('../utils/crypto');
 const logger = require('../utils/logger');
 const { getCurrentUser } = require('../utils/user');
 const { checkAuth } = require('../utils/middleware');

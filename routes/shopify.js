@@ -1,7 +1,5 @@
 const router = require('express').Router();
 const axios = require('axios');
-const { User } = require('../models/User');
-const { decrypt, getToken } = require('../utils/crypto');
 const logger = require('../utils/logger');
 const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl, getSessionFromStorage } = require('../utils/shop');
 const { checkAuth, checkStoreExistence } = require('../utils/middleware');
@@ -11,19 +9,41 @@ const { redisClient } = require('../om/redisClient');
 router.get(shopify.config.auth.path, shopify.auth.begin());
 
 router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), (req, res) => {
-	const { shop } = res.locals.shopify.session;
-	if (req.user) {
-		const userId = req.user._id;
-		redisClient.sAdd(`user_stores:${userId}`, shop)
+	try {
+		const { shop } = res.locals.shopify.session;
+		const storeData = {
+			name: shop
+		};
+
+		redisClient.hSet(`store:${shop}`, storeData)
 			.then(() => {
-				logger.info(`Store '${shop}' added to user_stores set for user with ID '${userId}'`);
-				res.redirect('/shopify/session');
+				logger.info(`Store object '${shop}' persisted`);
 			})
 			.catch(error => {
 				logger.error(error);
-				return res.status(500).json({ error: 'Internal Server Error' });
-			})
+				return res.status(500).json({ success: false, error: 'Internal Server Error' });
+			});
+
+		//user is logged in, save authorized store to current user
+		if (req.user) {
+			const userId = req.user._id;
+
+			redisClient.sAdd(`user_stores:${userId}`, shop)
+				.then(() => {
+					logger.info(`Store '${shop}' added to user_stores set for user with ID '${userId}'`);
+				})
+				.catch(error => {
+					logger.error(error);
+					return res.status(500).json({ success: false, error: 'Internal Server Error' });
+				});
+		}
+
+		return res.redirect('/shopify/session');
+	} catch (error) {
+		logger.error(error);
+		res.redirect(shopify.config.auth.path);
 	}
+
 });
 
 router.get('/shopify/session', async (req, res) => {
@@ -46,26 +66,28 @@ router.post('/shopify/orders', checkAuth, checkStoreExistence, async (req, res) 
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	// const shopifyAccessToken = getToken(req, 'shopify');
-	// const token = decrypt(shopifyAccessToken);
-	// if (!token) {
-	// 	return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
-	// }
-	//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
-	const storeSession = await getSessionFromStorage(store);
-	const token = storeSession.accessToken;
+	try {
+		// const shopifyAccessToken = getToken(req, 'shopify');
+		// const token = decrypt(shopifyAccessToken);
+		// if (!token) {
+		// 	return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
+		// }
+		//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
+		const storeSession = await getSessionFromStorage(store);
 
-	const orders = await shopify.api.rest.Order.all({
-		session: storeSession,
-		created_at_min: start,
-		created_at_max: end
-	});
+		const orders = await shopify.api.rest.Order.all({
+			session: storeSession,
+			created_at_min: start,
+			created_at_max: end
+		});
 
-	return res.json(orders);
-
+		return res.json(getMetrics(orders.data, granularity));
+	} catch (error) {
+		return res.status(500).json({ success: false, message: JSON.stringify(error) });
+	}
 
 	let allOrders = [];
-	let ordersEndpoint = `${getStoreApiURL(store)}/orders.json`;
+	let ordersEndpoint = `${getStoreApiURL(store)} / orders.json`;
 	let params = {
 		created_at_min: new Date(start),
 		created_at_max: new Date(end),
@@ -105,7 +127,7 @@ router.post('/shopify/orders', checkAuth, checkStoreExistence, async (req, res) 
 	fetchOrders();
 });
 
-router.post('/shopify/abandoned-checkouts', checkAuth, async (req, res) => {
+router.post('/shopify/abandoned-checkouts', checkAuth, checkStoreExistence, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
 
 	if (!(store && start && granularity)) {
@@ -125,7 +147,7 @@ router.post('/shopify/abandoned-checkouts', checkAuth, async (req, res) => {
 
 	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
 	let allAbandonedCheckouts = [];
-	let abandonedCheckoutEndpoint = `${getStoreApiURL(store)}/checkouts.json`;
+	let abandonedCheckoutEndpoint = `${getStoreApiURL(store)} / checkouts.json`;
 	let params = {
 		created_at_min: start,
 		created_at_max: endIncremented,
@@ -173,19 +195,19 @@ router.post('/shopify/most-wanted', checkAuth, async (req, res) => {
 
 	const query = `
 		{
-			products(first: 10, sortKey: BEST_SELLING) {
+						products(first: 10, sortKey: BEST_SELLING) {
 				edges {
 					node {
-						id
-						title
+									id
+									title
+								}
+							}
+						}
 					}
-				}
-			}
-		}
-		`;
+						`;
 
 	axios({
-		url: `${getStoreFrontApiURL(store)}/graphql.json`,
+		url: `${getStoreFrontApiURL(store)} / graphql.json`,
 		method: 'post',
 		headers: {
 			'Content-Type': 'application/json',
@@ -212,42 +234,46 @@ router.post('/shopify/product', checkAuth, async (req, res) => {
 		return res.status(400).json({ success: false, message: 'Invalid request body, missing product id' })
 	};
 
-	const storeSession = await getSessionFromStorage(store);
-	const token = storeSession.accessToken;
+	try {
+		const storeSession = await getSessionFromStorage(store);
 
-	const product = await shopify.api.rest.Product.find({
-		session: storeSession,
-		id: productId
-	});
+		const product = await shopify.api.rest.Product.find({
+			session: storeSession,
+			id: productId
+		});
 
-	return res.json(product);
+		return res.json(product);
+	} catch (error) {
+		return res.status(500).json({ success: false, message: JSON.stringify(error) });
+	}
+
 	const query = `
   query getProduct($productId: ID!) {
-    product(id: $productId) {
-      id
-      title
-      description
+					product(id: $productId) {
+						id
+						title
+						description
       featuredImage {
-        altText
-        url
-        width
-        height
-      }
+							altText
+							url
+							width
+							height
+						}
 			priceRange {
 				maxVariantPrice {
-					amount
-				}
+								amount
+							}
 				minVariantPrice {
-					amount
+								amount
+							}
+						}
+						onlineStoreUrl
+					}
 				}
-			}
-      onlineStoreUrl
-    }
-  }
-`;
+					`;
 
 	axios({
-		url: `${getStoreFrontApiURL(store)}/graphql.json`,
+		url: `${getStoreFrontApiURL(store)} / graphql.json`,
 		method: 'post',
 		headers: {
 			'Content-Type': 'application/json',
@@ -267,6 +293,10 @@ router.post('/shopify/product', checkAuth, async (req, res) => {
 		logger.error(error);
 		return res.status(500).json({ success: false, message: 'Internal server error' });
 	})
-})
+});
 
+router.get('/shopify/test', (req, res) => {
+	logger.info(req.session);
+	res.json(req.session);
+})
 module.exports = router;

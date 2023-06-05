@@ -69,6 +69,7 @@ const getSessionFromStorage = async (sessionId) => {
 		return arrayToObject(JSON.parse(session));
 	} catch (error) {
 		logger.error(error);
+		throw new Error("Failed to get session from storage");
 	};
 };
 
