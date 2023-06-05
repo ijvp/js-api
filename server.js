@@ -58,9 +58,9 @@ app.use(session({
 	saveUninitialized: false,
 	resave: false,
 	cookie: {
-		domain: process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "",
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+		domain: process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "",
+		secure: process.env.NODE_ENV !== 'development',
+		sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax'
 	}
 }));
 
@@ -81,7 +81,7 @@ app.use('/', userRoutes);
 
 // Tell express to allow nginx address directly next to app
 // which points to the aws production load balancer
-app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : 0);
+app.set('trust proxy', process.env.NODE_ENV !== 'development' ? 1 : 0);
 
 app.listen(port, () => {
 	logger.info('Server running on port %d', port);
