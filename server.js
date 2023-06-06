@@ -53,6 +53,11 @@ app.use((req, res, next) => {
 });
 app.use(cors(corsOptions));
 
+logger.info(`Environment target ${process.env.NODE_ENV}`);
+logger.info(process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "");
+logger.info(process.env.NODE_ENV === 'production');
+logger.info(process.env.NODE_ENV === 'production' ? 'none' : 'lax');
+
 app.use(session({
 	store: MongoStore.create(
 		{

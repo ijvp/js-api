@@ -43,19 +43,24 @@ router.post('/auth/login', (req, res) => {
 		username,
 		password
 	});
+	try {
+		req.login(user, err => {
+			if (err) {
+				logger.error(err);
+				res.status(500).json({ success: false, message: 'Internal server error' });
+			} else {
+				passport.authenticate('local')(req, res, () => {
+					const shopifyRedirect = res.req.user.shops.length === 0;
+					const user = getCurrentUser(req.user);
+					res.status(200).json({ success: true, shopifyRedirect: shopifyRedirect, user });
+				})
+			}
+		});
+	} catch (error) {
+		logger.error(error);
+		res.status(500).json({ success: false, message: 'Internal server error' });
+	}
 
-	req.login(user, err => {
-		if (err) {
-			logger.error(err);
-			res.status(500).json({ success: false, message: 'Internal server error' });
-		} else {
-			passport.authenticate('local')(req, res, () => {
-				const shopifyRedirect = res.req.user.shops.length === 0;
-				const user = getCurrentUser(req.user);
-				res.status(200).json({ success: true, shopifyRedirect: shopifyRedirect, user });
-			})
-		}
-	});
 });
 
 router.post('/auth/update', checkAuth, async (req, res) => {
