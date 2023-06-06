@@ -54,9 +54,9 @@ app.use((req, res, next) => {
 app.use(cors(corsOptions));
 
 logger.info(`Environment target ${process.env.NODE_ENV}`);
-logger.info(process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "");
-logger.info(process.env.NODE_ENV === 'production');
-logger.info(process.env.NODE_ENV === 'production' ? 'none' : 'lax');
+logger.info(process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "");
+logger.info(process.env.NODE_ENV !== 'development');
+logger.info(process.env.NODE_ENV !== 'development' ? 'none' : 'lax');
 
 app.use(session({
 	store: MongoStore.create(
@@ -71,9 +71,9 @@ app.use(session({
 	resave: false,
 	saveUninitialized: false,
 	cookie: {
-		domain: process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "",
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+		domain: process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "",
+		secure: process.env.NODE_ENV !== 'development',
+		sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax'
 	}
 }));
 
