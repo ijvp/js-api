@@ -7,7 +7,7 @@ const shopify = shopifyApp({
 	api: {
 		apiKey: process.env.SHOPIFY_API_KEY,
 		apiSecretKey: process.env.SHOPIFY_API_SECRET,
-		scopes: ['read_orders,read_products,read_product_listings'],
+		scopes: [process.env.SHOPIFY_SCOPES],
 		hostName: 'localhost:8080',
 		hostScheme: 'http',
 		isEmbeddedApp: false,

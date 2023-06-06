@@ -6,6 +6,13 @@ const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const shopify = require('../om/shopifyClient');
 const { redisClient } = require('../om/redisClient');
 
+router.get('/shopify/authorize', checkAuth, (req, res) => {
+	const redirectUri = `${process.env.BACKEND_URL}${shopify.config.auth.callbackPath}`;
+	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${process.env.SHOPIFY_API_KEY}&redirect_uri=${redirectUri}&scope=${process.env.SHOPIFY_SCOPES}`);
+
+	return res.status(200).json(authorizationUrl);
+});
+
 router.get(shopify.config.auth.path, shopify.auth.begin());
 
 router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), (req, res) => {
@@ -15,7 +22,7 @@ router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), (req, res)
 			name: shop
 		};
 
-		redisClient.hSet(`store:${shop}`, storeData)
+		redisClient.hSet(`store: ${shop}`, storeData)
 			.then(() => {
 				logger.info(`Store object '${shop}' persisted`);
 			})
@@ -28,7 +35,7 @@ router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), (req, res)
 		if (req.user) {
 			const userId = req.user._id;
 
-			redisClient.sAdd(`user_stores:${userId}`, shop)
+			redisClient.sAdd(`user_stores: ${userId}`, shop)
 				.then(() => {
 					logger.info(`Store '${shop}' added to user_stores set for user with ID '${userId}'`);
 				})
