@@ -89,7 +89,9 @@ app.use('/', userRoutes);
 
 // Tell express to allow nginx address directly next to app
 // which points to the aws production load balancer
-app.set('trust proxy', process.env.NODE_ENV !== 'development' ? 1 : 0);
+if (process.env.NODE_ENV !== 'development') {
+	app.set('trust proxy', 1)
+}
 
 app.listen(port, () => {
 	logger.info('Server running on port %d', port);
