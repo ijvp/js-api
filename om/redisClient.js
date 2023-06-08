@@ -1,14 +1,17 @@
-const redis = require('redis');
+const Redis = require('ioredis');
 const RedisStore = require('connect-redis').default;
 const logger = require('../utils/logger');
 
-// Session middleware
-const redisClient = redis.createClient({
-	url: `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`
-});
+const redisClient = new Redis({
+	host: process.env.REDIS_HOST,
+	port: process.env.REDIS_PORT
+})
 
-redisClient.connect().catch(logger.error)
-redisClient.on('error', err => logger.error(`Redis Client Error ${err}`));
+redisClient.on('connecting', () => logger.info('Redis client connecting...'));
+redisClient.on('reconnecting', () => logger.info('Redis client reconnecting...'))
+redisClient.on('connect', () => logger.info('Redis client connected'));
+redisClient.on('message', logger.info);
+redisClient.on('error', logger.error);
 
 const redisStore = new RedisStore({
 	client: redisClient,
