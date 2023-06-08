@@ -46,7 +46,8 @@ router.post('/auth/login', (req, res) => {
 	try {
 		req.login(user, err => {
 			if (err) {
-				logger.error(err);
+				console.log("AUTH ERR", err)
+				// logger.error(err);
 				res.status(500).json({ success: false, message: 'Internal server error' });
 			} else {
 				passport.authenticate('local')(req, res, () => {
@@ -57,7 +58,8 @@ router.post('/auth/login', (req, res) => {
 			}
 		});
 	} catch (error) {
-		logger.error(error);
+		console.log("CAUGHT ERROR", error)
+		// logger.error(error);
 		res.status(500).json({ success: false, message: 'Internal server error' });
 	}
 
