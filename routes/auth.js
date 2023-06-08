@@ -4,9 +4,10 @@ const logger = require('../utils/logger');
 const { getCurrentUser } = require('../utils/user');
 const { checkAuth } = require('../utils/middleware');
 const { User } = require('../models/User');
+const LocalStrategy = require('passport-local').Strategy;
 
-passport.use(User.createStrategy());
-
+// passport.use(User.createStrategy());
+passport.use(new LocalStrategy(User.authenticate()))
 passport.serializeUser((user, done) => done(null, user.id));
 
 passport.deserializeUser((id, done) => {
