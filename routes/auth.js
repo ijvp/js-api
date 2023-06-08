@@ -44,6 +44,7 @@ router.post('/auth/login', (req, res) => {
 		password
 	});
 	try {
+		console.log("called", user);
 		req.login(user, err => {
 			if (err) {
 				console.log("AUTH ERR", err)
