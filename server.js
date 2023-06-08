@@ -54,14 +54,7 @@ app.use((req, res, next) => {
 app.use(cors(corsOptions));
 
 app.use(session({
-	store: MongoStore.create(
-		{
-			mongoUrl: process.env.DB_CONNECT,
-			crypto: {
-				secret: process.env.DB_SECRET
-			}
-		}
-	),
+	store: redisStore,
 	secret: process.env.SESSION_SECRET,
 	resave: false,
 	saveUninitialized: false,
