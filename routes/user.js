@@ -5,6 +5,7 @@ const router = require('express').Router();
 
 router.get('/user/stores', checkAuth, async (req, res) => {
 	try {
+		logger.info("called, fetching user stores from redis")
 		const userId = req.user._id;
 		const userStores = await redisClient.sMembers(`user_stores:${userId}`);
 		return res.json({ stores: userStores })
