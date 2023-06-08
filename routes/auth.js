@@ -45,13 +45,13 @@ router.post('/auth/login', (req, res) => {
 		password
 	});
 	try {
-		console.log("called", user);
 		req.login(user, err => {
 			if (err) {
 				console.log("AUTH ERR", err)
 				// logger.error(err);
 				res.status(500).json({ success: false, message: 'Internal server error' });
 			} else {
+				console.log("ATTEMTPING PASSPORT AUTH CALL", user)
 				passport.authenticate('local')(req, res, () => {
 					const shopifyRedirect = res.req.user.shops.length === 0;
 					const user = getCurrentUser(req.user);
