@@ -12,4 +12,19 @@ const getCurrentUser = (unsafeUser) => {
 	return { _id, username, shops, googleConnected: !!unsafeUser.google_refresh_token, facebookConnected: !!unsafeUser.facebook_access_token };
 }
 
-module.exports = { getCurrentUser };
+const logIn = (req, userId) => {
+	req.session.userId = userId;
+};
+
+const logOut = (req, res) => {
+	new Promise((resolve, reject) => {
+		req.session.destroy(err => {
+			if (err) reject(err);
+			resolve();
+		});
+	});
+};
+
+const isLoggedIn = (req) => !!req.session.userId;
+
+module.exports = { getCurrentUser, logIn, logOut, isLoggedIn };

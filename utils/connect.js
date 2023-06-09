@@ -4,7 +4,7 @@ const logger = require('./logger');
 const connect = () => {
 	mongoose.set('strictQuery', true); //warning suppression
 	mongoose.connect(process.env.DB_CONNECT)
-		.then(() => logger.info("Connected to database"))
+		.then(() => logger.info("Connected to MongoDB"))
 		.catch(error => { logger.error(error); process.exit(1) });
 };
 

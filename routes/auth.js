@@ -1,73 +1,50 @@
 const router = require('express').Router();
 const passport = require('passport');
 const logger = require('../utils/logger');
-const { getCurrentUser } = require('../utils/user');
-const { checkAuth } = require('../utils/middleware');
+const { logIn, logOut } = require('../utils/user');
+const { encrypt } = require('../utils/crypto');
 const { User } = require('../models/User');
-const LocalStrategy = require('passport-local').Strategy;
+const { auth } = require('../middleware/auth');
 
 // passport.use(User.createStrategy());
-passport.use(new LocalStrategy(User.authenticate()))
-passport.serializeUser((user, done) => done(null, user.id));
+// passport.use(new LocalStrategy(User.authenticate()))
+// passport.serializeUser((user, done) => done(null, user.id));
 
-passport.deserializeUser((id, done) => {
-	User.findById(id, (err, user) => done(err, user));
-});
+// passport.deserializeUser((id, done) => {
+// 	User.findById(id, (err, user) => done(err, user));
+// });
 
-router.post('/auth/register', (req, res) => {
+router.post('/auth/register', async (req, res) => {
 	const { username, password } = req.body;
 
 	if (!(username && password)) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' });
 	}
 
-	User.register({ username }, password)
-		.then(user => {
-			passport.authenticate('local')(req, res, () => {
-				res.status(201).json({ success: true, username: user.username, message: "User was successfully created" });
-			})
-		})
-		.catch(error => {
-			logger.error(error);
-			res.status(409).json({ success: false, message: error.message });
-		})
+	const found = await User.exists({ username });
+	if (found) {
+		res.status(409).json({ success: false, message: "A user with the given username is already registered" });
+	};
+
+	const user = await User.create({ username, password: encrypt(password) })
+	logIn(req, user.id);
+	res.status(201).json({ success: true, message: `User '${user.username}' was created successfully` });
 });
 
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', async (req, res) => {
 	const { username, password } = req.body;
+	const found = await User.findOne({ username });
+	const passwordsMatch = found.matchesPassword(password);
 
-	if (!(username && password)) {
-		return res.status(400).json({ success: false, message: 'Invalid request body' });
+	if (!found || !passwordsMatch) {
+		return res.status(401).json({ success: false, message: 'Invalid username/password' })
 	}
 
-	const user = new User({
-		username,
-		password
-	});
-	try {
-		req.login(user, err => {
-			if (err) {
-				console.log("AUTH ERR", err)
-				// logger.error(err);
-				res.status(500).json({ success: false, message: 'Internal server error' });
-			} else {
-				console.log("ATTEMTPING PASSPORT AUTH CALL", user)
-				passport.authenticate('local')(req, res, () => {
-					const shopifyRedirect = res.req.user.shops.length === 0;
-					const user = getCurrentUser(req.user);
-					res.status(200).json({ success: true, shopifyRedirect: shopifyRedirect, user });
-				})
-			}
-		});
-	} catch (error) {
-		console.log("CAUGHT ERROR", error)
-		// logger.error(error);
-		res.status(500).json({ success: false, message: 'Internal server error' });
-	}
-
+	logIn(req, found.id);
+	return res.json({ success: true, message: "User logged in" });
 });
 
-router.post('/auth/update', checkAuth, async (req, res) => {
+router.post('/auth/update', auth, async (req, res) => {
 	const { username, password, newPassword } = req.body;
 
 	if (!(username && password)) {
@@ -105,19 +82,15 @@ router.post('/auth/update', checkAuth, async (req, res) => {
 	};
 });
 
-router.get('/auth/logout', checkAuth, (req, res, next) => {
-	req.logout(err => {
-		if (err) {
-			logger.error(err);
-			return res.status(500).json({ success: false, message: 'Logout failed: ' + err.message })
-		}
-		res.clearCookie('connect.sid');
-		res.status(200).json({ success: true, message: 'logged out' })
-	});
+router.get('/auth/logout', auth, async (req, res, next) => {
+	await logOut(req, res);
+	res.clearCookie('connect.sid');
+	res.status(200).json({ success: true, message: "User logged out" });
 });
 
-router.get('/auth/me', checkAuth, (req, res) => {
-	res.status(200).json(getCurrentUser(req.user));
+router.get('/auth/me', auth, async (req, res) => {
+	const { id, username } = await User.findById(req.session.userId);
+	res.status(200).json({ id, username });
 });
 
 module.exports = router;

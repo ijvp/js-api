@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-const passportLocalMongoose = require('passport-local-mongoose');
 const { ShopSchema } = require('./Shop');
+const { decrypt } = require('../utils/crypto');
 
 const UserSchema = new mongoose.Schema({
 	username: String,
@@ -8,7 +8,11 @@ const UserSchema = new mongoose.Schema({
 	shops: [ShopSchema]
 }, { strict: false });
 
-UserSchema.plugin(passportLocalMongoose);
+// UserSchema.plugin(passportLocalMongoose);
+
+UserSchema.methods.matchesPassword = function (password) {
+	return password === decrypt(this.password);
+};
 
 const User = mongoose.model('User', UserSchema);
 
