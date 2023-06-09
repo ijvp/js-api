@@ -41,6 +41,7 @@ router.post('/auth/login', async (req, res) => {
 	}
 
 	logIn(req, found.id);
+	console.log("CALLED, LOGGED IN", found.id)
 	return res.json({ success: true, message: "User logged in" });
 });
 
