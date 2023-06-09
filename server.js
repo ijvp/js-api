@@ -53,15 +53,36 @@ const whitelist = [
 // });
 // app.use(cors(corsOptions));
 
+//REDIS SESSION MIDDLEWARE
+// app.use(session({
+// 	store: redisStore,
+// 	secret: process.env.SESSION_SECRET,
+// 	resave: false,
+// 	saveUninitialized: false,
+// 	cookie: {
+// 		domain: process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "",
+// 		secure: process.env.NODE_ENV !== 'development',
+// 		sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax'
+// 	}
+// }));
+
+//MONGOSTORE SESSION MIDDLEWARE
 app.use(session({
-	store: redisStore,
+	store: MongoStore.create(
+		{
+			mongoUrl: process.env.DB_CONNECT,
+			crypto: {
+				secret: process.env.DB_SECRET
+			}
+		}
+	),
 	secret: process.env.SESSION_SECRET,
 	resave: false,
 	saveUninitialized: false,
 	cookie: {
-		domain: process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "",
-		secure: process.env.NODE_ENV !== 'development',
-		sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax'
+		domain: process.env.NODE_ENV === 'production' ? 'turbopartners.com.br' : "",
+		secure: process.env.NODE_ENV === 'production',
+		sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
 	}
 }));
 
