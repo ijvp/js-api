@@ -28,30 +28,30 @@ const app = express();
 const whitelist = [
 	process.env.FRONTEND_URL
 ];
-// const corsOptions = {
-// 	credentials: true,
-// 	origin: function (origin, callback) {
-// 		//TODO: test this line and other corsOption.req middleware
-// 		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
-// 		if (forwardedHost === process.env.FRONTEND_URL) {
-// 			callback(null, true);
-// 		}
-// 		//Postman bypass for local development since it has no origin
-// 		else if (!origin) {
-// 			callback(null, true);
-// 		}
-// 		else if (whitelist.indexOf(origin) !== -1) {
-// 			callback(null, true)
-// 		} else {
-// 			callback(new Error('Not allowed by CORS', origin))
-// 		}
-// 	}
-// };
-// app.use((req, res, next) => {
-// 	corsOptions.req = req;
-// 	next();
-// });
-// app.use(cors(corsOptions));
+const corsOptions = {
+	credentials: true,
+	origin: function (origin, callback) {
+		//TODO: test this line and other corsOption.req middleware
+		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
+		if (forwardedHost === process.env.FRONTEND_URL) {
+			callback(null, true);
+		}
+		//Postman bypass for local development since it has no origin
+		else if (!origin) {
+			callback(null, true);
+		}
+		else if (whitelist.indexOf(origin) !== -1) {
+			callback(null, true)
+		} else {
+			callback(new Error('Not allowed by CORS', origin))
+		}
+	}
+};
+app.use((req, res, next) => {
+	corsOptions.req = req;
+	next();
+});
+app.use(cors(corsOptions));
 
 //REDIS SESSION MIDDLEWARE
 app.use(session({
