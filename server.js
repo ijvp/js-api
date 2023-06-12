@@ -28,7 +28,7 @@ const app = express();
 // which points to the aws production load balancer
 if (process.env.NODE_ENV !== 'development') {
 	logger.info(`Configuring nginx proxy for env:${process.env.NODE_ENV}`);
-	app.set('trust proxy', 1);
+	app.set('trust proxy', true);
 };
 
 // Redis session middleware
