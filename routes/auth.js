@@ -34,15 +34,15 @@ router.post('/auth/register', async (req, res) => {
 router.post('/auth/login', async (req, res) => {
 	const { username, password } = req.body;
 	const found = await User.findOne({ username });
-	const passwordsMatch = found.matchesPassword(password);
+	const passwordsMatch = await found.matchesPassword(password);
 	console.log("REACHED LOGIN ENDPOINT", username, password, passwordsMatch);
 	if (!found || !passwordsMatch) {
 		return res.status(401).json({ success: false, message: 'Invalid username/password' })
 	}
 
 	logIn(req, found.id);
-	console.log("CALLED, LOGGED IN", found.id)
-	return res.json({ success: true, message: "User logged in" });
+	console.log("CALLED, LOGGED IN", found.id, req.session)
+	res.json({ success: true, message: "User logged in" });
 });
 
 router.post('/auth/update', auth, async (req, res) => {
