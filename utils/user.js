@@ -14,6 +14,7 @@ const getCurrentUser = (unsafeUser) => {
 
 const logIn = (req, userId) => {
 	req.session.userId = userId;
+	req.session.save();
 };
 
 const logOut = (req, res) => {
