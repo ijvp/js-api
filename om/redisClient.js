@@ -29,6 +29,7 @@ if (process.env.NODE_ENV === 'development') {
 redisClient.on('connecting', () => logger.info('Redis client connecting...'));
 redisClient.on('reconnecting', () => logger.info('Redis client reconnecting...'))
 redisClient.on('connect', () => logger.info('Redis client connected'));
+redisClient.on('ready', () => logger.info('Redis client is ready'));
 redisClient.on('message', logger.info);
 redisClient.on('error', logger.error);
 
