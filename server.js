@@ -90,6 +90,7 @@ app.use('/', facebookRoutes);
 app.use('/', userRoutes);
 
 app.listen(port, () => {
+	logger.info('NODE ENV: %d', process.env.NODE_ENV);
 	logger.info('Server running on port %d', port);
 	connect();
 });
