@@ -2,10 +2,29 @@ const Redis = require('ioredis');
 const RedisStore = require('connect-redis').default;
 const logger = require('../utils/logger');
 
-const redisClient = new Redis({
-	host: process.env.REDIS_HOST,
-	port: process.env.REDIS_PORT
-})
+let redisClient;
+
+if (process.env.NODE_ENV === 'development') {
+	redisClient = new Redis({
+		host: process.env.REDIS_HOST,
+		port: process.env.REDIS_PORT
+	});
+} else {
+	const nodes = [{
+		host: process.env.REDIS_HOST,
+		port: process.env.REDIS_PORT
+	}];
+
+	const options = {
+		redisOptions: {
+			tls: {
+				checkServerIdentity: (servername, cert) => { return undefined }
+			}
+		}
+	}
+
+	redisClient = new Redis.Cluster(nodes, options);
+}
 
 redisClient.on('connecting', () => logger.info('Redis client connecting...'));
 redisClient.on('reconnecting', () => logger.info('Redis client reconnecting...'))
