@@ -39,8 +39,8 @@ app.use(session({
 	saveUninitialized: false,
 	cookie: {
 		domain: process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "",
-		secure: process.env.NODE_ENV !== 'development',
-		sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax'
+		secure: false,
+		sameSite: 'lax'
 	},
 	proxy: process.env.NODE_ENV !== 'development'
 }));
