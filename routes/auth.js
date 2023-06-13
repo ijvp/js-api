@@ -42,7 +42,6 @@ router.post('/auth/login', async (req, res) => {
 	}
 
 	logIn(req, found.id);
-	res.cookie()
 	res.json({ success: true, message: "User logged in" });
 });
 
