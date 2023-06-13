@@ -43,6 +43,7 @@ router.post('/auth/login', async (req, res) => {
 	}
 
 	await logIn(req, found.id);
+	res.setHeader("Set-Cookie", "tech=shark"); // NAO REMOVA ESSA LINHA!
 	res.json({ success: true, message: "User logged in" });
 });
 
