@@ -17,14 +17,14 @@ router.get('/shopify/authorize', auth, (req, res) => {
 
 router.get(shopify.config.auth.path, shopify.auth.begin());
 
-router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), (req, res) => {
+router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), auth, (req, res) => {
 	try {
 		const { shop } = res.locals.shopify.session;
 		const storeData = {
 			name: shop
 		};
 
-		redisClient.hSet(`store: ${shop}`, storeData)
+		redisClient.hset(`store:${shop}`, storeData)
 			.then(() => {
 				logger.info(`Store object '${shop}' persisted`);
 			})
@@ -33,26 +33,22 @@ router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), (req, res)
 				return res.status(500).json({ success: false, error: 'Internal Server Error' });
 			});
 
-		//user is logged in, save authorized store to current user
-		if (req.user) {
-			const userId = req.user._id;
+		const userId = req.session.userId;
 
-			redisClient.sAdd(`user_stores: ${userId}`, shop)
-				.then(() => {
-					logger.info(`Store '${shop}' added to user_stores set for user with ID '${userId}'`);
-				})
-				.catch(error => {
-					logger.error(error);
-					return res.status(500).json({ success: false, error: 'Internal Server Error' });
-				});
-		}
+		redisClient.sadd(`user_stores:${userId}`, shop)
+			.then(() => {
+				logger.info(`Store '${shop}' added to user_stores set for user with ID '${userId}'`);
+			})
+			.catch(error => {
+				logger.error(error);
+				return res.status(500).json({ success: false, error: 'Internal Server Error' });
+			});
 
-		return res.redirect('/shopify/session');
+		return res.redirect(process.env.FRONTEND_URL);
 	} catch (error) {
 		logger.error(error);
 		res.redirect(shopify.config.auth.path);
 	}
-
 });
 
 router.get('/shopify/session', async (req, res) => {
@@ -68,7 +64,7 @@ router.get('/shopify/session', async (req, res) => {
 //currently only returns paid orders
 //parameters: store: String, start (Date), end (Date), granularity: 'day' | 'hour',
 //triplewhale additional parameters: match? [], metricsBreakdown: boolean, shopId (shop.name)
-router.post('/shopify/orders', checkAuth, checkStoreExistence, async (req, res) => {
+router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
 
 	if (!(store && start && granularity)) {

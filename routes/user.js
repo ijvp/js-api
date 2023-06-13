@@ -5,10 +5,8 @@ const router = require('express').Router();
 
 router.get('/user/stores', auth, async (req, res) => {
 	try {
-		console.log("CALLED, FETCHING USER STORES")
-		const userId = req.session.userId;
-		const userStores = await redisClient.smembers(`user_stores:${userId}`);
-		return res.json({ stores: userStores })
+		const userStores = await redisClient.smembers(`user_stores:${req.session.userId}`);
+		return res.json(userStores);
 	} catch (error) {
 		logger.error(`Failed to fetch user stores: ${error}`);
 		return res.status(500).json({ success: false, error: "Internal Server Error" });

@@ -10,10 +10,10 @@ const checkAuth = (req, res, next) => {
 };
 
 const checkStoreExistence = (req, res, next) => {
-	const userId = req.user._id;
+	const userId = req.session.userId;
 	const store = req.method === 'POST' ? req.body.store : req.query.store;
 
-	redisClient.sIsMember(`user_stores:${userId}`, store)
+	redisClient.sismember(`user_stores:${userId}`, store)
 		.then(result => {
 			if (!result) {
 				return res.status(404).json({ success: false, error: "Store not found" })
