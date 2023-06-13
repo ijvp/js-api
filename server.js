@@ -37,6 +37,11 @@ app.use(session({
 	secret: process.env.SESSION_SECRET,
 	resave: false,
 	saveUninitialized: false,
+	cookie: {
+		domain: process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "",
+		secure: process.env.NODE_ENV !== 'development',
+		sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax'
+	}
 }));
 
 // CORS middleware

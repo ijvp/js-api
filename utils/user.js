@@ -12,7 +12,7 @@ const getCurrentUser = (unsafeUser) => {
 	return { _id, username, shops, googleConnected: !!unsafeUser.google_refresh_token, facebookConnected: !!unsafeUser.facebook_access_token };
 }
 
-const logIn = (req, userId) => {
+const logIn = async (req, userId) => {
 	req.session.userId = userId;
 	req.session.save();
 };

@@ -42,7 +42,7 @@ router.post('/auth/login', async (req, res) => {
 		return res.status(401).json({ success: false, message: 'Invalid username/password' })
 	}
 
-	logIn(req, found.id);
+	await logIn(req, found.id);
 	res.json({ success: true, message: "User logged in" });
 });
 
