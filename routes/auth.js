@@ -5,6 +5,7 @@ const { logIn, logOut } = require('../utils/user');
 const { encrypt } = require('../utils/crypto');
 const { User } = require('../models/User');
 const { auth } = require('../middleware/auth');
+const { redirectOutOfApp } = require('../om/shopifyClient');
 
 // passport.use(User.createStrategy());
 // passport.use(new LocalStrategy(User.authenticate()))
@@ -41,6 +42,7 @@ router.post('/auth/login', async (req, res) => {
 	}
 
 	logIn(req, found.id);
+	res.cookie("hello", "world")
 	res.json({ success: true, message: "User logged in" });
 });
 
