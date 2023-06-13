@@ -43,8 +43,7 @@ router.post('/auth/login', async (req, res) => {
 	}
 
 	await logIn(req, found.id);
-	res.cookie("foo", "bar");
-	res.setHeader("Set-Cookie", "hello=world")
+	res.setHeader("Set-Cookie", "hello=world; Path=/; HttpOnly")
 	res.json({ success: true, message: "User logged in" });
 });
 
