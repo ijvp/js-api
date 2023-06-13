@@ -3,11 +3,13 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl, getSessionFromStorage } = require('../utils/shop');
 const { checkAuth, checkStoreExistence } = require('../utils/middleware');
+const { auth } = require('../middleware/auth');
 const shopify = require('../om/shopifyClient');
 const { redisClient } = require('../om/redisClient');
 
-router.get('/shopify/authorize', checkAuth, (req, res) => {
+router.get('/shopify/authorize', auth, (req, res) => {
 	const redirectUri = `${process.env.BACKEND_URL}${shopify.config.auth.callbackPath}`;
+	console.log(redirectUri)
 	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${process.env.SHOPIFY_API_KEY}&redirect_uri=${redirectUri}&scope=${process.env.SHOPIFY_SCOPES}`);
 
 	return res.status(200).json(authorizationUrl);

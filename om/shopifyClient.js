@@ -8,8 +8,8 @@ const shopify = shopifyApp({
 		apiKey: process.env.SHOPIFY_API_KEY,
 		apiSecretKey: process.env.SHOPIFY_API_SECRET,
 		scopes: [process.env.SHOPIFY_SCOPES],
-		hostName: 'localhost:8080',
-		hostScheme: 'http',
+		hostName: process.env.URL,
+		hostScheme: process.env.NODE_ENV === 'development' ? 'http' : 'https',
 		isEmbeddedApp: false,
 		restResources
 	},
