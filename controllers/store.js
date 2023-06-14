@@ -1,41 +1,56 @@
+const { logger } = require('../utils/logger');
+
 class StoreController {
 	constructor(redisClient) {
 		this.redisClient = redisClient;
 	};
 
 	async getStoresByUserId(userId) {
-		const storeIds = await this.redisClient.smembers(`user_stores:${userId}`);
-		const stores = [];
+		try {
+			const storeIds = await this.redisClient.smembers(`user_stores:${userId}`);
+			return storeIds;
+			// const stores = [];
 
-		for (const storeId of storeIds) {
-			const store = await this.redisClient.hgetall(`stores:${storeId}`);
-			stores.push(store);
+			// for (const storeId of storeIds) {
+			// 	const store = await this.redisClient.hgetall(`stores:${storeId}`);
+			// 	if (store) {
+			// 		stores.push(store);
+			// 	}
+			// }
+
+			// return stores;
+		} catch (error) {
+			logger.error('Error retrieving stores by user ID: %s', error);
+			throw error;
 		}
+	}
 
-		return stores;
-	};
+	async getStoreConnections(storeId) {
+		try {
+			const connections = {
+				facebook_account: false,
+				google_account: false,
+			};
 
-	async getStoreConnectionsByStoreId(storeId) {
-		const connections = {
-			facebook_account: false,
-			google_account: false,
-		};
+			const [facebookAccountExists, googleAccountExists] = await Promise.all([
+				this.redisClient.exists(`facebook_account:${storeId}`),
+				this.redisClient.exists(`google_account:${storeId}`),
+			]);
 
-		const facebookAccountExists = await this.redisClient.exists(
-			`facebook_account:${storeId}`
-		);
-		const googleAccountExists = await this.redisClient.exists(
-			`google_account:${storeId}`
-		);
+			if (facebookAccountExists) {
+				connections.facebook_account = true;
+			}
 
-		if (facebookAccountExists) {
-			connections.facebook_account = true;
+			if (googleAccountExists) {
+				connections.google_account = true;
+			}
+
+			return connections;
+		} catch (error) {
+			logger.error('Error retrieving store connections by store ID: %s', error);
+			throw error;
 		}
-
-		if (googleAccountExists) {
-			connections.google_account = true;
-		}
-
-		return connections;
 	};
 };
+
+module.exports = StoreController;
