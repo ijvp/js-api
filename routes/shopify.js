@@ -6,6 +6,9 @@ const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const { auth } = require('../middleware/auth');
 const shopify = require('../om/shopifyClient');
 const { redisClient } = require('../om/redisClient');
+const StoreController = require('../controllers/store');
+
+const storeController = new StoreController(redisClient);
 
 router.get('/shopify/authorize', auth, (req, res) => {
 	const redirectUri = `${process.env.BACKEND_URL}${shopify.config.auth.callbackPath}`;
@@ -17,48 +20,28 @@ router.get('/shopify/authorize', auth, (req, res) => {
 
 router.get(shopify.config.auth.path, shopify.auth.begin());
 
-router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), auth, (req, res) => {
+router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), async (req, res) => {
 	try {
 		const { shop } = res.locals.shopify.session;
-		const storeData = {
+		const store = {
 			name: shop
 		};
 
-		redisClient.hset(`store:${shop}`, storeData)
-			.then(() => {
-				logger.info(`Store object '${shop}' persisted`);
-			})
-			.catch(error => {
-				logger.error(error);
-				return res.status(500).json({ success: false, error: 'Internal Server Error' });
-			});
+		await storeController.createStore(store);
 
-		const userId = req.session.userId;
-
-		redisClient.sadd(`user_stores:${userId}`, shop)
-			.then(() => {
-				logger.info(`Store '${shop}' added to user_stores set for user with ID '${userId}'`);
-			})
-			.catch(error => {
-				logger.error(error);
-				return res.status(500).json({ success: false, error: 'Internal Server Error' });
-			});
+		// TODO: shopify oAuth flow when user installs app 
+		// before registering TurboDash account.
+		// How to keep storeRef and associate user at a
+		// later point?
+		if (req.session.userId) {
+			await storeController.associateStoreWithUser(store.name, userId);
+		};
 
 		return res.redirect(process.env.FRONTEND_URL);
 	} catch (error) {
 		logger.error(error);
 		res.redirect(shopify.config.auth.path);
 	}
-});
-
-router.get('/shopify/session', async (req, res) => {
-	const sessionId = await shopify.api.session.getCurrentId({
-		isOnline: true,
-		rawRequest: req,
-		rawResponse: res
-	});
-
-	res.json({ shopify, sessionId });
 });
 
 //currently only returns paid orders
@@ -72,14 +55,8 @@ router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
 	};
 
 	try {
-		// const shopifyAccessToken = getToken(req, 'shopify');
-		// const token = decrypt(shopifyAccessToken);
-		// if (!token) {
-		// 	return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
-		// }
 		//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
-		const storeSession = await getSessionFromStorage(store);
-
+		const storeSession = await storeController.getStoreShopifySession(store);
 		const orders = await shopify.api.rest.Order.all({
 			session: storeSession,
 			created_at_min: start,
@@ -88,7 +65,7 @@ router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
 
 		return res.json(getMetrics(orders.data, granularity));
 	} catch (error) {
-		return res.status(500).json({ success: false, message: JSON.stringify(error) });
+		return res.status(500).json({ success: false, error: JSON.stringify(error) });
 	}
 
 	let allOrders = [];
