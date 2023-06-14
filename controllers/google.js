@@ -1,3 +1,5 @@
+const { logger } = require('../utils/logger');
+
 class GoogleController {
 	constructor(redisClient) {
 		this.redisClient = redisClient;
