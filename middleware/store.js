@@ -1,8 +1,10 @@
-export const storeExists = (req, res, next) => {
-	const store = req.method === 'POST' ? req.body.store : req.query.store;
-	const userId = req.session.userId;
+const logger = require('../utils/logger');
+const { redisClient } = require('../om/redisClient');
 
-	redisClient.sIsMember(`user_stores:${userId}`, store)
+const storeExists = async (req, res, next) => {
+	const store = req.method === 'POST' ? req.body.store : req.query.store;
+
+	redisClient.sismember(`user_stores:${req.session.userId}`, store)
 		.then(result => {
 			if (!result) {
 				return next(new Error('Store not found'))
@@ -14,4 +16,6 @@ export const storeExists = (req, res, next) => {
 			logger.error(`Error checking store existence: ${err}`);
 			return next(new Error('Internal Server Error'))
 		})
-}
+};
+
+module.exports = { storeExists };

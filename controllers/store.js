@@ -1,5 +1,5 @@
 const shopify = require("../om/shopifyClient");
-const { logger } = require('../utils/logger');
+const logger = require('../utils/logger');
 
 const arrayToObject = (arr) => {
 	const result = {};
@@ -38,21 +38,21 @@ class StoreController {
 	async getStoreConnections(storeId) {
 		try {
 			const connections = {
-				facebook_account: false,
-				google_account: false,
+				facebook_ads: false,
+				google_ads: false,
 			};
 
 			const [facebookAccountExists, googleAccountExists] = await Promise.all([
-				this.redisClient.exists(`facebook_account:${storeId}`),
-				this.redisClient.exists(`google_account:${storeId}`),
+				this.redisClient.exists(`facebook_ads_account:${storeId}`),
+				this.redisClient.exists(`google_ads_account:${storeId}`),
 			]);
 
 			if (facebookAccountExists) {
-				connections.facebook_account = true;
+				connections.facebook_ads = true;
 			}
 
 			if (googleAccountExists) {
-				connections.google_account = true;
+				connections.google_ads = true;
 			}
 
 			return connections;

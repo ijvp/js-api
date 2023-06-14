@@ -6,9 +6,14 @@ const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const axios = require('axios');
 const { differenceInDays, parseISO } = require('date-fns');
 const { redisClient } = require('../om/redisClient');
+const FacebookController = require('../controllers/facebook');
+const { auth } = require('../middleware/auth');
+const { storeExists } = require('../middleware/store');
+
+const facebookController = new FacebookController(redisClient);
 
 //Login facebook, quando usuário finalizar login chama a rota callback
-router.get("/facebook/authorize", checkAuth, async (req, res) => {
+router.get("/facebook/authorize", auth, async (req, res) => {
   const { store } = req.query;
   if (!store) {
     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
@@ -17,7 +22,7 @@ router.get("/facebook/authorize", checkAuth, async (req, res) => {
 });
 
 //Callback, usa o "code" que veio na requisição da rota de login(connect) para buscar o access token do usuário, com o access token buscamos o id do usuário. O access token e o id são salvos no banco de dados.
-router.get("/facebook/callback", checkAuth, async (req, res) => {
+router.get("/facebook/callback", auth, async (req, res) => {
   const { code, state: shop } = req.query;
   await axios({
     method: 'get',
@@ -38,7 +43,7 @@ router.get("/facebook/callback", checkAuth, async (req, res) => {
         });
 
       try {
-        await redisClient.hSet(`store:${shop}`, 'fb_access_token', response.data.acess_token);
+        await facebookController.grantFacebookAccessToStore(shop, response.data.access_token);
         return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=facebook&store=${shop}`);
       } catch (error) {
         logger.error(error);
@@ -49,7 +54,7 @@ router.get("/facebook/callback", checkAuth, async (req, res) => {
 
 
 //Rota para buscar as contas administradas pelo usuário que fez o login, usamos o facebook_access_token do usuário logado para fazer a busca.
-router.get("/facebook/accounts", checkAuth, checkStoreExistence, async (req, res) => {
+router.get("/facebook/accounts", auth, storeExists, async (req, res) => {
   try {
     const { store } = req.query;
     const token = await redisClient.hGet(`store:${store}`, 'fb_token');
@@ -98,40 +103,25 @@ router.get("/facebook/accounts", checkAuth, checkStoreExistence, async (req, res
 //         "account_id": account id na loja no facebook,
 //     }
 // ]
-router.post("/facebook/account/connect", checkAuth, checkStoreExistence, async (req, res) => {
+router.post("/facebook/account/connect", auth, storeExists, async (req, res) => {
   const { account, store } = req.body;
 
   if (!(account && store)) {
     return res.status(400).json({ success: false, message: 'Invalid request body' });
-  }
+  };
 
-  await User.findById(req.user.id).then(async user => {
-    const shop = user.shops.find((shop) => shop.name === store);
-
-    if (!shop) {
-      return res.status(404).json({ success: false, message: 'Store not found' })
-    } else {
-      shop.facebook_business = {
-        id: account.id,
-        name: account.name
-      };
-      user.markModified("shops");
-      user.save(err => {
-        if (err) {
-          logger.error(err);
-          return res.status(500).json({ success: false, message: 'Internal server error' });
-        } else {
-          res.status(201).json({
-            success: true, message: `Facebook business account ${account.name} added to ${store}`
-          });
-        }
-      });
-    };
-  })
-
+  try {
+    await facebookController.createFacebookAdsAccount({ ...account, storeId: store });
+    return res.status(201).json({
+      success: true, message: `Facebook Ads account ${account.name} added to ${store}`
+    });
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  };
 });
 
-router.get("/facebook/account/disconnect", checkAuth, checkStoreExistence, async (req, res) => {
+router.get("/facebook/account/disconnect", auth, checkStoreExistence, async (req, res) => {
   const { store } = req.query;
 
   if (!store) {
@@ -160,7 +150,7 @@ router.get("/facebook/account/disconnect", checkAuth, checkStoreExistence, async
 //Rota para buscar os gastos, e o roas de uma conta no facebook business
 // Tem que ser enviado o id da loja, a rota usa o access token do usuario a rota usa o access token do usuário ao id do das cotas administradas pelo usuário logado 
 // O startDate e o endDate tem que ser enviados no padrão yyyy-mm-dd
-router.post("/facebook/ads", checkAuth, async (req, res) => {
+router.post("/facebook/ads", auth, async (req, res) => {
   const { store, start, end } = req.body;
   if (!store) {
     return res.status(400).send('Invalid request body, missing store')
