@@ -32,7 +32,7 @@ class StoreController {
 		} catch (error) {
 			logger.error('Error retrieving stores by user ID: %s', error);
 			throw error;
-		}
+		};
 	};
 
 	async getStoreConnections(storeId) {
