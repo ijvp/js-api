@@ -34,7 +34,7 @@ router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), async (req
 		// How to keep storeRef and associate user at a
 		// later point?
 		if (req.session.userId) {
-			await storeController.associateStoreWithUser(store.name, userId);
+			await storeController.associateStoreWithUser(store.name, req.session.userId);
 		};
 
 		return res.redirect(process.env.FRONTEND_URL);
