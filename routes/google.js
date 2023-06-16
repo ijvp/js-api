@@ -141,74 +141,89 @@ router.post("/google/accounts/manager", checkAuth, async (req, res) => {
 
 router.post("/google/ads", checkAuth, checkStoreExistence, async (req, res) => {
   const { start, end, store } = req.body;
+  const userId = req.session.userId;
 
   if (!start && !end) {
     return res.status(400).send('Start date and end date must be set');
   };
 
   try {
-    const { google_refresh_token: token, google_id: googleId } = await redisClient.hGetAll(`store:${store}`, 'google_refresh_token');
+    const { google_refresh_token: refresh_token, google_id: googleId, google_access_token: access_token } = await redisClient.hGetAll(`store:${store}`, 'google_refresh_token', 'google_access_token');
     if (!googleId) {
       return res.status(404).send('No Google Ads account associated with this store');
     };
 
-    const account = client.Customer({
-      customer_id: googleId,
-      refresh_token: token,
-    });
+    // const account = client.Customer({
+    //   customer_id: googleId,
+    //   refresh_token: token,
+    // });
 
-    const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start)));
+    const formData = new URLSearchParams();
+    formData.append('access_token', `${access_token}`);
+    formData.append('refresh_token', `${refresh_token}`);
+
+    //const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start)));
     const startDate = start.split("T")[0];
     const endDate = end.split("T")[0];
 
-    await account.report({
-      from_date: startDate,
-      to_date: endDate,
-      segments: isSingleDay === 0 ? ["segments.hour"] : ["segments.date"],
-      entity: "campaign",
-      attributes: [
-        "campaign.id",
-        "campaign.name"
-      ],
-      metrics: [
-        "metrics.cost_micros"
-      ]
+    axios.post(`${process.env.PYEND_URL}/google/ads?store=${store}&start=${startDate}&end=${endDate}&id=${userId}`, formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    }).then((response) => {
+      return res.status(200).send(response.data)
+    }).catch((error) => {
+      throw (error)
     })
-      .then(data => {
-        let metrics = {
-          id: "google-ads.ads-metrics",
-          metricsBreakdown: []
-        }
 
-        data.forEach(ad => {
-          let dateKey;
-          if (!isSingleDay) {
-            const campaignHour = ad.segments.hour < 10 ? `0${ad.segments.hour}` : `${ad.segments.hour}`;
-            const utcDate = new Date(Date.parse(start));
-            const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60 * 1000));
-            const localDateTime = new Date(`${localDate.toISOString().substring(0, 10)}T${campaignHour}:00:00`);
-            dateKey = localDateTime.toISOString().slice(0, -11);
-          } else {
-            dateKey = ad.segments.date;
-          }
+    // await account.report({
+    //   from_date: startDate,
+    //   to_date: endDate,
+    //   segments: isSingleDay === 0 ? ["segments.hour"] : ["segments.date"],
+    //   entity: "campaign",
+    //   attributes: [
+    //     "campaign.id",
+    //     "campaign.name"
+    //   ],
+    //   metrics: [
+    //     "metrics.cost_micros"
+    //   ]
+    // })
+    //   .then(data => {
+    //     let metrics = {
+    //       id: "google-ads.ads-metrics",
+    //       metricsBreakdown: []
+    //     }
 
-          const dateExists = metrics.metricsBreakdown.find((byDate) => byDate.date === dateKey);
+    //     data.forEach(ad => {
+    //       let dateKey;
+    //       if (!isSingleDay) {
+    //         const campaignHour = ad.segments.hour < 10 ? `0${ad.segments.hour}` : `${ad.segments.hour}`;
+    //         const utcDate = new Date(Date.parse(start));
+    //         const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60 * 1000));
+    //         const localDateTime = new Date(`${localDate.toISOString().substring(0, 10)}T${campaignHour}:00:00`);
+    //         dateKey = localDateTime.toISOString().slice(0, -11);
+    //       } else {
+    //         dateKey = ad.segments.date;
+    //       }
 
-          if (dateExists) {
-            dateExists.metrics.spend += ad.metrics.cost_micros / 1000000;
-          } else {
-            const dayDate = {
-              date: dateKey,
-              metrics: {
-                spend: ad.metrics.cost_micros / 1000000
-              }
-            }
-            metrics.metricsBreakdown.push(dayDate);
-          }
-        });
+    //       const dateExists = metrics.metricsBreakdown.find((byDate) => byDate.date === dateKey);
 
-        return res.status(200).json(metrics);
-      })
+    //       if (dateExists) {
+    //         dateExists.metrics.spend += ad.metrics.cost_micros / 1000000;
+    //       } else {
+    //         const dayDate = {
+    //           date: dateKey,
+    //           metrics: {
+    //             spend: ad.metrics.cost_micros / 1000000
+    //           }
+    //         }
+    //         metrics.metricsBreakdown.push(dayDate);
+    //       }
+    //     });
+
+    //     return res.status(200).json(metrics);
+    //   })
   } catch (error) {
     logger.error(error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
