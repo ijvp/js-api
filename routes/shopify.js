@@ -23,6 +23,8 @@ router.get(shopify.config.auth.path, shopify.auth.begin());
 router.get(shopify.config.auth.callbackPath, async (req, res) => {
 	try {
 		const { shop } = res.locals.shopify.session;
+		console.log('res.locals.shopify.session', res.locals.shopify.session)
+		console.log('shop', shop)
 		const store = {
 			name: shop
 		};
