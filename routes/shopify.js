@@ -19,8 +19,8 @@ router.get('/shopify/authorize', auth, (req, res) => {
 });
 
 router.get(shopify.config.auth.path, shopify.auth.begin());
-
-router.get(shopify.config.auth.callbackPath, shopify.auth.callback(), async (req, res) => {
+/*, shopify.auth.callback()*/
+router.get(shopify.config.auth.callbackPath, async (req, res) => {
 	try {
 		const { shop } = res.locals.shopify.session;
 		const store = {
@@ -68,45 +68,6 @@ router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
 		return res.status(500).json({ success: false, error: JSON.stringify(error) });
 	}
 
-	let allOrders = [];
-	let ordersEndpoint = `${getStoreApiURL(store)} / orders.json`;
-	let params = {
-		created_at_min: new Date(start),
-		created_at_max: new Date(end),
-		financial_status: 'paid',
-		status: 'any',
-		limit: 250
-	};
-
-	const fetchOrders = () => {
-		axios.get(ordersEndpoint, {
-			params,
-			headers: {
-				'X-Shopify-Access-Token': token
-			}
-		})
-			.then(response => {
-				//alguns pedidos podem ter sidos cancelados depois de pagos
-				const trueOrders = response.data.orders.filter(order => order.cancelled_at === null);
-				allOrders = allOrders.concat(trueOrders);
-				ordersEndpoint = extractHttpsUrl(response.headers.link);
-				if (ordersEndpoint) {
-					params = undefined; //must clear original query parameters otherwise new endpoint will return 400
-					fetchOrders(); // Call the function recursively to continue fetching orders
-				} else {
-					return res.status(200).json({
-						id: 'shopify.order-metrics',
-						metricsBreakdown: getMetrics(allOrders, granularity)
-					});
-				}
-			})
-			.catch(error => {
-				logger.error(error);
-				return res.status(500).json({ sucess: false, message: 'Internal server error' });
-			});
-	};
-
-	fetchOrders();
 });
 
 router.post('/shopify/abandoned-checkouts', checkAuth, checkStoreExistence, async (req, res) => {
@@ -127,43 +88,6 @@ router.post('/shopify/abandoned-checkouts', checkAuth, checkStoreExistence, asyn
 
 	return res.json(abandonedCheckouts);
 
-	let endIncremented = end ? new Date(new Date(end).setDate(new Date(end).getDate() + 1)) : undefined;
-	let allAbandonedCheckouts = [];
-	let abandonedCheckoutEndpoint = `${getStoreApiURL(store)} / checkouts.json`;
-	let params = {
-		created_at_min: start,
-		created_at_max: endIncremented,
-		limit: 250
-	}
-
-	const fetchAbandonedCheckouts = () => {
-		axios.get(abandonedCheckoutEndpoint, {
-			params: params,
-			headers: {
-				'X-Shopify-Access-Token': token
-			}
-		})
-			.then(response => {
-				const { checkouts } = response.data;
-				allAbandonedCheckouts = allAbandonedCheckouts.concat(checkouts);
-				abandonedCheckoutEndpoint = extractHttpsUrl(response.headers.link);
-				if (abandonedCheckoutEndpoint) {
-					params = undefined;
-					fetchAbandonedCheckouts();
-				} else {
-					res.status(200).json({
-						id: 'shopify.abandoned-checkout-metrics',
-						metricsBreakdown: getMetrics(allAbandonedCheckouts, granularity)
-					});
-				}
-			})
-			.catch(error => {
-				logger.error(error);
-				res.status(500).json({ success: false, message: 'Internal server error' });
-			});
-	};
-
-	fetchAbandonedCheckouts();
 });
 
 router.post('/shopify/most-wanted', checkAuth, async (req, res) => {
@@ -229,52 +153,6 @@ router.post('/shopify/product', checkAuth, async (req, res) => {
 		return res.status(500).json({ success: false, message: JSON.stringify(error) });
 	}
 
-	const query = `
-  query getProduct($productId: ID!) {
-					product(id: $productId) {
-						id
-						title
-						description
-      featuredImage {
-							altText
-							url
-							width
-							height
-						}
-			priceRange {
-				maxVariantPrice {
-								amount
-							}
-				minVariantPrice {
-								amount
-							}
-						}
-						onlineStoreUrl
-					}
-				}
-					`;
-
-	axios({
-		url: `${getStoreFrontApiURL(store)} / graphql.json`,
-		method: 'post',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Shopify-Storefront-Access-Token': token
-		},
-		data: JSON.stringify({
-			query: query,
-			variables: { productId: productId }
-		})
-	}).then((response) => {
-		if (response.data.errors) {
-			return res.status(500).send({ success: false, message: response.data.errors })
-		} else {
-			return res.status(200).send(response.data.data.product)
-		}
-	}).catch((error) => {
-		logger.error(error);
-		return res.status(500).json({ success: false, message: 'Internal server error' });
-	})
 });
 
 router.get('/shopify/test', (req, res) => {
