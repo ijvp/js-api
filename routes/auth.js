@@ -52,7 +52,7 @@ router.post('/auth/update', auth, async (req, res) => {
 		return res.status(400).json({ success: false, message: 'Invalid request body' });
 	};
 
-	const user = await User.findById(req.user._id);
+	const user = await User.findById(req.session.userId);
 	if (!user) {
 		return res.status(404).json({ success: false, message: 'User not found' });
 	}
@@ -72,14 +72,14 @@ router.post('/auth/update', auth, async (req, res) => {
 			return res.status(400).json({ success: false, message: 'New password cannot be the same as previous password' });
 		};
 
-		return user.changePassword(password, newPassword)
-			.then(() => {
-				return res.status(200).json({ success: true, message: 'User updated successfully' });
-			})
-			.catch(error => {
-				logger.error(error);
-				return res.status(500).json({ success: false, message: 'Internal server error' });
-			});
+		user.password = encrypt(newPassword);
+		try {
+			user.save();
+			return res.status(200).json({ success: true, message: 'User updated successfully' });
+		} catch (error) {
+			logger.error(error);
+			return res.status(500).json({ success: false, message: 'Internal server error' });
+		};
 	};
 });
 
