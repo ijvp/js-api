@@ -101,7 +101,7 @@ class StoreController {
 			logger.error("Failed to exchange authorization code for access token: %s", error);
 			throw error;
 		}
-	}
+	};
 
 	async fetchStoreOrders({ storeId, start, end }) {
 		try {
@@ -166,8 +166,39 @@ class StoreController {
 			logger.error('Failed to fetch abandoned checkouts: %s', error);
 			throw error;
 		}
-	}
+	};
 
+	async fetchBestSellingProducts(storeId) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+
+			let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+			const query = `{
+				products(first: 10, sortKey: BEST_SELLING) {
+					edges {
+						node {
+							id
+							title
+						}
+					}
+				}
+			}`;
+
+			const response = await axios.post(graphqlEndpoint,
+				{ query },
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Storefront-Access-Token': accessToken
+					}
+				});
+
+			return response.data.data.products.edges;
+		} catch (error) {
+			logger.error('Failed to fetch abandoned checkouts %s', error);
+			throw error;
+		};
+	};
 };
 
 module.exports = StoreController;

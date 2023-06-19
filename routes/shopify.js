@@ -61,12 +61,11 @@ router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
 		const orders = await storeController.fetchStoreOrders({ storeId: store, start, end });
 		return res.json(getMetrics(orders, granularity));
 	} catch (error) {
-		logger.error(error);
 		return res.status(500).json({ success: false, error: 'Internal Server Error' });
-	}
+	};
 });
 
-router.post('/shopify/abandoned-checkouts', checkAuth, checkStoreExistence, async (req, res) => {
+router.post('/shopify/abandoned-checkouts', auth, checkStoreExistence, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
 
 	if (!(store && start && granularity)) {
@@ -77,53 +76,22 @@ router.post('/shopify/abandoned-checkouts', checkAuth, checkStoreExistence, asyn
 		const abandonedCheckouts = await storeController.fetchStoreAbandonedCheckouts({ storeId: store, start, end });
 		return res.json(getMetrics(abandonedCheckouts, granularity));
 	} catch (error) {
-		logger.error(error);
 		return res.status(500).json({ success: false, error: 'Internal Server Error' });
 	}
 });
 
-router.post('/shopify/most-wanted', checkAuth, async (req, res) => {
+router.post('/shopify/most-wanted', auth, async (req, res) => {
 	const { store } = req.body;
 	if (!store) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	const storeSession = await getSessionFromStorage(store);
-	const token = storeSession.accessToken;
-
-	const query = `
-		{
-						products(first: 10, sortKey: BEST_SELLING) {
-				edges {
-					node {
-									id
-									title
-								}
-							}
-						}
-					}
-						`;
-
-	axios({
-		url: `${getStoreFrontApiURL(store)} / graphql.json`,
-		method: 'post',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Shopify-Storefront-Access-Token': token
-		},
-		data: JSON.stringify({
-			query: query
-		})
-	}).then((response) => {
-		if (response.data.errors) {
-			return res.status(500).send({ success: false, message: response.data.errors })
-		} else {
-			return res.status(200).send(response.data.data.products.edges)
-		}
-	}).catch((error) => {
-		logger.error(error);
-		return res.status(500).json({ success: false, message: 'Internal server error' });
-	})
+	try {
+		const products = await storeController.fetchBestSellingProducts(store);
+		res.json(products);
+	} catch (error) {
+		return res.status(500).json({ success: false, error: 'Internal Server Error' });
+	};
 });
 
 router.post('/shopify/product', checkAuth, async (req, res) => {
@@ -144,7 +112,6 @@ router.post('/shopify/product', checkAuth, async (req, res) => {
 	} catch (error) {
 		return res.status(500).json({ success: false, message: JSON.stringify(error) });
 	}
-
 });
 
 router.get('/shopify/test', (req, res) => {
