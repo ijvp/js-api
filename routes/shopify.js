@@ -42,7 +42,7 @@ router.get(shopify.config.auth.callbackPath, async (req, res) => {
 		return res.redirect(process.env.FRONTEND_URL);
 	} catch (error) {
 		logger.error(error);
-		res.redirect(shopify.config.auth.path);
+		res.redirect(`${process.env.FRONTEND_URL}?`);
 	}
 });
 
