@@ -10,6 +10,7 @@ const guest = (req, res, next) => {
 
 const auth = (req, res, next) => {
 	if (!isLoggedIn(req)) {
+		console.log(req)
 		return next(new Error('You must be logged in'))
 	}
 
