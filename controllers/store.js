@@ -83,16 +83,6 @@ class StoreController {
 		};
 	};
 
-	// async getStoreShopifySession(storeId) {
-	// 	try {
-	// 		const session = await this.redisClient.get(`${shopify.config.sessionStorage.options.sessionKeyPrefix}_offline_${storeId}`);
-	// 		return arrayToObject(JSON.parse(session));
-	// 	} catch (error) {
-	// 		logger.error(error);
-	// 		throw error;
-	// 	};
-	// };
-
 	async getShopAccessToken(store, authCode) {
 		try {
 			const response = await axios.post(`https://${store}/admin/oauth/access_token?client_id=${process.env.SHOPIFY_API_KEY}&client_secret=${process.env.SHOPIFY_API_SECRET}&code=${authCode}`);
@@ -199,6 +189,18 @@ class StoreController {
 			throw error;
 		};
 	};
+
+	async deleteStoreData(userId, storeId) {
+		try {
+			await this.redisClient.del(`facebook_ads_account:${storeId}`);
+			await this.redisClient.del(`google_ads_account:${storeId}`);
+			await this.redisClient.del(`store:${storeId}`);
+			await this.redisClient.srem(`user_stores:${userId}`, storeId);
+		} catch (error) {
+			logger.error(`Failed to delete data for store '${store}': %s`, error);
+			throw error;
+		}
+	}
 };
 
 module.exports = StoreController;
