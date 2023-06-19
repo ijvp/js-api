@@ -143,6 +143,7 @@ router.post("/google/accounts/manager", checkAuth, async (req, res) => {
 router.post("/google/ads", auth, checkStoreExistence, async (req, res) => {
   const { start, end, store } = req.body;
   const userId = req.session.userId;
+  console.log( start, end, store )
 
   if (!start && !end) {
     return res.status(400).send('Start date and end date must be set');
