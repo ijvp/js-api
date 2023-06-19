@@ -73,17 +73,13 @@ router.post('/shopify/abandoned-checkouts', checkAuth, checkStoreExistence, asyn
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	const storeSession = await getSessionFromStorage(store);
-	const token = storeSession.accessToken;
-
-	const abandonedCheckouts = await shopify.api.rest.AbandonedCheckout.checkouts({
-		session: storeSession,
-		created_at_min: start,
-		created_at_max: end
-	});
-
-	return res.json(abandonedCheckouts);
-
+	try {
+		const abandonedCheckouts = await storeController.fetchStoreAbandonedCheckouts({ storeId: store, start, end });
+		return res.json(getMetrics(abandonedCheckouts, granularity));
+	} catch (error) {
+		logger.error(error);
+		return res.status(500).json({ success: false, error: 'Internal Server Error' });
+	}
 });
 
 router.post('/shopify/most-wanted', checkAuth, async (req, res) => {

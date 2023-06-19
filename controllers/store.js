@@ -134,6 +134,40 @@ class StoreController {
 			throw error;
 		};
 	};
+
+	async fetchStoreAbandonedCheckouts({ storeId, start, end }) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const abandonedCheckouts = [];
+
+			let abandonedCheckoutEndpoint = `${getStoreApiURL(storeId)}/checkouts.json`;
+			let params = {
+				created_at_min: start,
+				created_at_max: end,
+				limit: 250
+			};
+
+			while (abandonedCheckoutEndpoint) {
+				const response = await axios.get(abandonedCheckoutEndpoint, {
+					params,
+					headers: {
+						'X-Shopify-Access-Token': accessToken
+					}
+				});
+
+				const { checkouts } = response.data;
+				abandonedCheckouts.push(...checkouts);
+				abandonedCheckoutEndpoint = extractHttpsUrl(response.headers.link);
+				params = undefined; // Clear original query parameters to prevent errors on subsequent requests
+			}
+
+			return abandonedCheckouts;
+		} catch (error) {
+			logger.error('Failed to fetch abandoned checkouts: %s', error);
+			throw error;
+		}
+	}
+
 };
 
 module.exports = StoreController;
