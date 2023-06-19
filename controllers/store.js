@@ -1,5 +1,6 @@
-const shopify = require("../om/shopifyClient");
 const logger = require('../utils/logger');
+const { getStoreApiURL, extractHttpsUrl } = require('../utils/shop');
+const axios = require('axios');
 
 const arrayToObject = (arr) => {
 	const result = {};
@@ -82,12 +83,119 @@ class StoreController {
 		};
 	};
 
-	async getStoreShopifySession(storeId) {
+	// async getStoreShopifySession(storeId) {
+	// 	try {
+	// 		const session = await this.redisClient.get(`${shopify.config.sessionStorage.options.sessionKeyPrefix}_offline_${storeId}`);
+	// 		return arrayToObject(JSON.parse(session));
+	// 	} catch (error) {
+	// 		logger.error(error);
+	// 		throw error;
+	// 	};
+	// };
+
+	async getShopAccessToken(store, authCode) {
 		try {
-			const session = await this.redisClient.get(`${shopify.config.sessionStorage.options.sessionKeyPrefix}_offline_${storeId}`);
-			return arrayToObject(JSON.parse(session));
+			const response = await axios.post(`https://${store}/admin/oauth/access_token?client_id=${process.env.SHOPIFY_API_KEY}&client_secret=${process.env.SHOPIFY_API_SECRET}&code=${authCode}`);
+			return response.data;
 		} catch (error) {
-			logger.error(error);
+			logger.error("Failed to exchange authorization code for access token: %s", error);
+			throw error;
+		}
+	};
+
+	async fetchStoreOrders({ storeId, start, end }) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const allOrders = [];
+			let ordersEndpoint = `${getStoreApiURL(storeId)}/orders.json`;
+
+			while (ordersEndpoint) {
+				const response = await axios.get(ordersEndpoint, {
+					params: {
+						created_at_min: new Date(start),
+						created_at_max: new Date(end),
+						financial_status: 'paid',
+						status: 'any',
+						limit: 250
+					},
+					headers: {
+						'X-Shopify-Access-Token': accessToken
+					}
+				});
+
+				const trueOrders = response.data.orders.filter(order => order.cancelled_at === null);
+				allOrders.push(...trueOrders);
+				ordersEndpoint = extractHttpsUrl(response.headers.link);
+			};
+
+			return allOrders;
+		} catch (error) {
+			logger.error("Failed to fetch orders: %s", error);
+			throw error;
+		};
+	};
+
+	async fetchStoreAbandonedCheckouts({ storeId, start, end }) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const abandonedCheckouts = [];
+
+			let abandonedCheckoutEndpoint = `${getStoreApiURL(storeId)}/checkouts.json`;
+			let params = {
+				created_at_min: start,
+				created_at_max: end,
+				limit: 250
+			};
+
+			while (abandonedCheckoutEndpoint) {
+				const response = await axios.get(abandonedCheckoutEndpoint, {
+					params,
+					headers: {
+						'X-Shopify-Access-Token': accessToken
+					}
+				});
+
+				const { checkouts } = response.data;
+				abandonedCheckouts.push(...checkouts);
+				abandonedCheckoutEndpoint = extractHttpsUrl(response.headers.link);
+				params = undefined; // Clear original query parameters to prevent errors on subsequent requests
+			}
+
+			return abandonedCheckouts;
+		} catch (error) {
+			logger.error('Failed to fetch abandoned checkouts: %s', error);
+			throw error;
+		}
+	};
+
+	async fetchBestSellingProducts(storeId) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+
+			let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+			const query = `{
+				products(first: 10, sortKey: BEST_SELLING) {
+					edges {
+						node {
+							id
+							title
+						}
+					}
+				}
+			}`;
+
+			const response = await axios.post(graphqlEndpoint,
+				{ query },
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Storefront-Access-Token': accessToken
+					}
+				});
+
+			return response.data.data.products.edges;
+		} catch (error) {
+			logger.error('Failed to fetch abandoned checkouts %s', error);
 			throw error;
 		};
 	};

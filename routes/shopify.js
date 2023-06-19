@@ -12,21 +12,21 @@ const storeController = new StoreController(redisClient);
 
 router.get('/shopify/authorize', auth, (req, res) => {
 	const redirectUri = `${process.env.BACKEND_URL}${shopify.config.auth.callbackPath}`;
-	console.log(redirectUri)
 	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${process.env.SHOPIFY_API_KEY}&redirect_uri=${redirectUri}&scope=${process.env.SHOPIFY_SCOPES}`);
-
 	return res.status(200).json(authorizationUrl);
 });
 
 router.get(shopify.config.auth.path, shopify.auth.begin());
-/*, shopify.auth.callback()*/
+
 router.get(shopify.config.auth.callbackPath, async (req, res) => {
 	try {
-		const { shop } = res.locals.shopify.session;
-		console.log('res.locals.shopify.session', res.locals.shopify.session)
-		console.log('shop', shop)
+		const { code, hmac, shop, state } = req.query;
+		const { access_token, scope } = await storeController.getShopAccessToken(shop, code);
+
 		const store = {
-			name: shop
+			name: shop,
+			shopifyAccessToken: access_token,
+			scope
 		};
 
 		await storeController.createStore(store);
@@ -42,7 +42,7 @@ router.get(shopify.config.auth.callbackPath, async (req, res) => {
 		return res.redirect(process.env.FRONTEND_URL);
 	} catch (error) {
 		logger.error(error);
-		res.redirect(shopify.config.auth.path);
+		res.redirect(`${process.env.FRONTEND_URL}?shopify-install-error=true`);
 	}
 });
 
@@ -58,82 +58,40 @@ router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
 
 	try {
 		//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
-		const storeSession = await storeController.getStoreShopifySession(store);
-		const orders = await shopify.api.rest.Order.all({
-			session: storeSession,
-			created_at_min: start,
-			created_at_max: end
-		});
-
-		return res.json(getMetrics(orders.data, granularity));
+		const orders = await storeController.fetchStoreOrders({ storeId: store, start, end });
+		return res.json(getMetrics(orders, granularity));
 	} catch (error) {
-		return res.status(500).json({ success: false, error: JSON.stringify(error) });
-	}
-
+		return res.status(500).json({ success: false, error: 'Internal Server Error' });
+	};
 });
 
-router.post('/shopify/abandoned-checkouts', checkAuth, checkStoreExistence, async (req, res) => {
+router.post('/shopify/abandoned-checkouts', auth, checkStoreExistence, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
 
 	if (!(store && start && granularity)) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	const storeSession = await getSessionFromStorage(store);
-	const token = storeSession.accessToken;
-
-	const abandonedCheckouts = await shopify.api.rest.AbandonedCheckout.checkouts({
-		session: storeSession,
-		created_at_min: start,
-		created_at_max: end
-	});
-
-	return res.json(abandonedCheckouts);
-
+	try {
+		const abandonedCheckouts = await storeController.fetchStoreAbandonedCheckouts({ storeId: store, start, end });
+		return res.json(getMetrics(abandonedCheckouts, granularity));
+	} catch (error) {
+		return res.status(500).json({ success: false, error: 'Internal Server Error' });
+	}
 });
 
-router.post('/shopify/most-wanted', checkAuth, async (req, res) => {
+router.post('/shopify/most-wanted', auth, async (req, res) => {
 	const { store } = req.body;
 	if (!store) {
 		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
-	const storeSession = await getSessionFromStorage(store);
-	const token = storeSession.accessToken;
-
-	const query = `
-		{
-						products(first: 10, sortKey: BEST_SELLING) {
-				edges {
-					node {
-									id
-									title
-								}
-							}
-						}
-					}
-						`;
-
-	axios({
-		url: `${getStoreFrontApiURL(store)} / graphql.json`,
-		method: 'post',
-		headers: {
-			'Content-Type': 'application/json',
-			'X-Shopify-Storefront-Access-Token': token
-		},
-		data: JSON.stringify({
-			query: query
-		})
-	}).then((response) => {
-		if (response.data.errors) {
-			return res.status(500).send({ success: false, message: response.data.errors })
-		} else {
-			return res.status(200).send(response.data.data.products.edges)
-		}
-	}).catch((error) => {
-		logger.error(error);
-		return res.status(500).json({ success: false, message: 'Internal server error' });
-	})
+	try {
+		const products = await storeController.fetchBestSellingProducts(store);
+		res.json(products);
+	} catch (error) {
+		return res.status(500).json({ success: false, error: 'Internal Server Error' });
+	};
 });
 
 router.post('/shopify/product', checkAuth, async (req, res) => {
@@ -154,7 +112,6 @@ router.post('/shopify/product', checkAuth, async (req, res) => {
 	} catch (error) {
 		return res.status(500).json({ success: false, message: JSON.stringify(error) });
 	}
-
 });
 
 router.get('/shopify/test', (req, res) => {
