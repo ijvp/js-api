@@ -140,7 +140,7 @@ router.post("/google/accounts/manager", checkAuth, async (req, res) => {
   })
 });
 
-router.post("/google/ads", checkAuth, checkStoreExistence, async (req, res) => {
+router.post("/google/ads", auth, checkStoreExistence, async (req, res) => {
   const { start, end, store } = req.body;
   const userId = req.session.userId;
 
