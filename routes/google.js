@@ -150,7 +150,7 @@ router.post("/google/ads", auth, checkStoreExistence, async (req, res) => {
   };
 
   try {
-    const { google_refresh_token: refresh_token, google_id: googleId, google_access_token: access_token } = await redisClient.hGetAll(`store:${store}`, 'google_refresh_token', 'google_access_token');
+    const { google_refresh_token: refresh_token, google_id: googleId, google_access_token: access_token } = await redisClient.hgetall(`store:${store}`, 'google_refresh_token', 'google_access_token');
     if (!googleId) {
       return res.status(404).send('No Google Ads account associated with this store');
     };
