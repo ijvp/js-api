@@ -93,8 +93,8 @@ router.get('/google/account/disconnect', auth, checkStoreExistence, async (req, 
     const userStores = await redisClient.sMembers(`user_stores:${userId}`);
     const found = userStores.find(store => store === store);
     if (found) {
-      await redisClient.hDel(`store:${store}`, 'google_id');
-      await redisClient.hDel(`store:${store}`, 'google_name');
+      await redisClient.hdel(`store:${store}`, 'google_id');
+      await redisClient.hdel(`store:${store}`, 'google_name');
 
       return res.status(201).json({
         success: true, message: `Google Ads account disconnected from ${store}`
@@ -143,7 +143,7 @@ router.post("/google/accounts/manager", checkAuth, async (req, res) => {
 router.post("/google/ads", auth, checkStoreExistence, async (req, res) => {
   const { start, end, store } = req.body;
   const userId = req.session.userId;
-  console.log( start, end, store )
+  console.log(start, end, store)
 
   if (!start && !end) {
     return res.status(400).send('Start date and end date must be set');

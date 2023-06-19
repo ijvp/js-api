@@ -57,7 +57,7 @@ router.get("/facebook/callback", auth, async (req, res) => {
 router.get("/facebook/accounts", auth, storeExists, async (req, res) => {
   try {
     const { store } = req.query;
-    const token = await redisClient.hGet(`store:${store}`, 'fb_token');
+    const token = await redisClient.hget(`store:${store}`, 'fb_token');
 
     if (!token) {
       return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
