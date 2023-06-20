@@ -59,6 +59,7 @@ router.get('/google/callback', auth, (req, res) => {
     };
 
     try {
+      console.log(token)
       await googleController.grantGoogleAccessToStore(shop, token);
       return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${shop}`);
     } catch (error) {
@@ -89,12 +90,15 @@ router.post("/google/account/connect", auth, storeExists, async (req, res) => {
 //Disconnects google account from a user's shop
 router.get('/google/account/disconnect', auth, checkStoreExistence, async (req, res) => {
   try {
-    const userId = req.user._id;
-    const userStores = await redisClient.sMembers(`user_stores:${userId}`);
+    const userId = req.session.userId;
+    const store = req.method === 'POST' ? req.body.store : req.query.store;
+
+    const userStores = await redisClient.smembers(`user_stores:${userId}`);
     const found = userStores.find(store => store === store);
     if (found) {
-      await redisClient.hdel(`store:${store}`, 'google_id');
-      await redisClient.hdel(`store:${store}`, 'google_name');
+      await redisClient.hdel(`store:${store}`, 'googleAccessToken');
+      await redisClient.hdel(`store:${store}`, 'googleRefreshToken');
+      await redisClient.del(`google_ads_account:${store}`)
 
       return res.status(201).json({
         success: true, message: `Google Ads account disconnected from ${store}`
@@ -120,115 +124,20 @@ router.get('/google/accounts', auth, checkStoreExistence, async (req, res) => {
   }
 });
 
-//Save google_manager_id to req.user
-router.post("/google/accounts/manager", checkAuth, async (req, res) => {
-  const { managerId } = req.body;
-
-  User.findById(req.user._id).then(user => {
-    user.google_manager_id = managerId;
-
-    user.markModified("User");
-    user.save(err => {
-      if (err) logger.error(err);
-    })
-
-    return user;
-  }).then((response) => {
-    return res.status(200).json(response);
-  }).catch((error) => {
-    return res.status(400).send(error);
-  })
-});
-
 router.post("/google/ads", auth, checkStoreExistence, async (req, res) => {
   const { start, end, store } = req.body;
-  const userId = req.session.userId;
-  console.log(start, end, store)
 
   if (!start && !end) {
     return res.status(400).send('Start date and end date must be set');
   };
 
+  const startDate = start.split("T")[0];  
+  const endDate = end.split("T")[0];
+
   try {
-    const { test } = await redisClient.hgetall(`store:${store}`);
+    const response = await axios.post(`${process.env.PYEND_URL}/google/ads?store=${store}&start=${startDate}&end=${endDate}`)
 
-    console.log(test)
-
-    if (!googleId) {
-      return res.status(404).send('No Google Ads account associated with this store');
-    };
-
-    // const account = client.Customer({
-    //   customer_id: googleId,
-    //   refresh_token: token,
-    // });
-
-    const formData = new URLSearchParams();
-    formData.append('access_token', `${access_token}`);
-    formData.append('refresh_token', `${refresh_token}`);
-
-    //const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start)));
-    const startDate = start.split("T")[0];
-    const endDate = end.split("T")[0];
-
-    axios.post(`${process.env.PYEND_URL}/google/ads?store=${store}&start=${startDate}&end=${endDate}&id=${userId}`, formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    }).then((response) => {
-      return res.status(200).send(response.data)
-    }).catch((error) => {
-      throw (error)
-    })
-
-    // await account.report({
-    //   from_date: startDate,
-    //   to_date: endDate,
-    //   segments: isSingleDay === 0 ? ["segments.hour"] : ["segments.date"],
-    //   entity: "campaign",
-    //   attributes: [
-    //     "campaign.id",
-    //     "campaign.name"
-    //   ],
-    //   metrics: [
-    //     "metrics.cost_micros"
-    //   ]
-    // })
-    //   .then(data => {
-    //     let metrics = {
-    //       id: "google-ads.ads-metrics",
-    //       metricsBreakdown: []
-    //     }
-
-    //     data.forEach(ad => {
-    //       let dateKey;
-    //       if (!isSingleDay) {
-    //         const campaignHour = ad.segments.hour < 10 ? `0${ad.segments.hour}` : `${ad.segments.hour}`;
-    //         const utcDate = new Date(Date.parse(start));
-    //         const localDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60 * 1000));
-    //         const localDateTime = new Date(`${localDate.toISOString().substring(0, 10)}T${campaignHour}:00:00`);
-    //         dateKey = localDateTime.toISOString().slice(0, -11);
-    //       } else {
-    //         dateKey = ad.segments.date;
-    //       }
-
-    //       const dateExists = metrics.metricsBreakdown.find((byDate) => byDate.date === dateKey);
-
-    //       if (dateExists) {
-    //         dateExists.metrics.spend += ad.metrics.cost_micros / 1000000;
-    //       } else {
-    //         const dayDate = {
-    //           date: dateKey,
-    //           metrics: {
-    //             spend: ad.metrics.cost_micros / 1000000
-    //           }
-    //         }
-    //         metrics.metricsBreakdown.push(dayDate);
-    //       }
-    //     });
-
-    //     return res.status(200).json(metrics);
-    //   })
+    return res.status(200).send(response.data)
   } catch (error) {
     logger.error(error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
