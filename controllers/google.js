@@ -37,7 +37,7 @@ class GoogleController {
 
 	async grantGoogleAccessToStore(storeId, tokens) {
 		try {
-			await this.redisClient.hset(`store:${storeId}`, {
+			await this.redisClient.hmset(`store:${storeId}`, {
 				googleAccessToken: tokens.access_token,
 				googleRefreshToken: tokens.refresh_token
 			});
