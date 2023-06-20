@@ -21,7 +21,7 @@ const shopify = shopifyApp({
 		path: '/shopify/webhooks'
 	},
 	sessionStorage: new RedisSessionStorage(
-		process.env.REDIS_URL,
+		`redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
 		{
 			sessionKeyPrefix: "shopify_sessions:"
 		}
