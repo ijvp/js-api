@@ -55,7 +55,7 @@ router.get("/facebook/callback", auth, async (req, res) => {
 router.get("/facebook/accounts", auth, storeExists, async (req, res) => {
   try {
     const { store } = req.query;
-    const accounts = facebookController.fetchFacebookAccountList(store);
+    const accounts = await facebookController.fetchFacebookAccountList(store);
     return res.status(200).json(accounts);
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Internal server error' });
