@@ -22,6 +22,8 @@ router.get("/facebook/authorize", auth, async (req, res) => {
 //Callback, usa o "code" que veio na requisição da rota de login(connect) para buscar o access token do usuário, com o access token buscamos o id do usuário. O access token e o id são salvos no banco de dados.
 router.get("/facebook/callback", auth, async (req, res) => {
   const { code, state: shop } = req.query;
+  console.log("SHOP", shop);
+
   await axios({
     method: 'get',
     url: `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/oauth/access_token?redirect_uri=${process.env.FACEBOOK_API_REDIRECT_URL}&client_id=${process.env.FACEBOOK_API_CLIENT_ID}&client_secret=${process.env.FACEBOOK_API_CLIENT_SECRET}&code=${code}`
