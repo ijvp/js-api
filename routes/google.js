@@ -56,7 +56,6 @@ router.get('/google/callback', auth, (req, res) => {
     };
 
     try {
-      console.log(token)
       await googleController.grantGoogleAccessToStore(shop, token);
       return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${shop}`);
     } catch (error) {

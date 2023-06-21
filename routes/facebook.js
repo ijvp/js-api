@@ -1,8 +1,6 @@
 const router = require('express').Router();
-const { decrypt } = require('../utils/crypto');
 const logger = require('../utils/logger');
 const axios = require('axios');
-const { differenceInDays, parseISO } = require('date-fns');
 const { redisClient } = require('../om/redisClient');
 const FacebookController = require('../controllers/facebook');
 const { auth } = require('../middleware/auth');
@@ -106,73 +104,17 @@ router.get("/facebook/account/disconnect", auth, storeExists, async (req, res) =
 // O startDate e o endDate tem que ser enviados no padrão yyyy-mm-dd
 router.post("/facebook/ads", auth, storeExists, async (req, res) => {
   const { store, start, end } = req.body;
-  if (!store) {
-    return res.status(400).send('Invalid request body, missing store')
-  }
 
   if (!start && !end) {
-    return res.status(400).send('Start date and end date must be set');
-  }
-
-  let shop = await req.user.shops.find((shop) => shop.name === store);
-  if (!shop) {
-    return res.status(404).send("Store not found")
-  }
-
-  if (!shop.facebook_business) {
-    return res.status(404).send("No facebook business associated with this store");
-  }
-
-  const campaign = {
-    id: 'facebook-ads.ads-metrics',
-    metricsBreakdown: []
-  };
-
-  const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start))) === 0;
-  const since = start.split("T")[0];
-  const until = end.split("T")[0];
-
-  let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${shop.facebook_business.id}/insights`;
-  let params = {
-    time_range: { since, until },
-    level: "account",
-    fields: "campaign_name,adset_name,ad_name,spend,purchase_roas",
-    access_token: decrypt(shop.facebook_access_token)
-  };
-
-  if (!isSingleDay) {
-    params.time_increment = 1;
-  } else {
-    params.breakdowns = "hourly_stats_aggregated_by_advertiser_time_zone";
+    return res.status(400).json({ success: false, message: 'Invalid request body' });
   }
 
   try {
-    do {
-      const response = await axios.get(url, { params: params });
-      let resData = response.data.data;
-      resData.forEach(data => {
-        let indexHour;
-        if (isSingleDay) {
-          indexHour = data.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
-        }
-
-        const dailyDataDate = !isSingleDay ? `${data.date_start}` : `${data.date_start}T${indexHour}`;
-        let dailyData = {
-          date: dailyDataDate,
-          metrics: {
-            spend: parseFloat(data.spend),
-          }
-        }
-        campaign.metricsBreakdown.push(dailyData);
-      })
-      url = response.data.paging?.next;
-    } while (url);
+    const ads = await facebookController.fetchFacebookAds(store, start, end);
+    return res.status(200).json(ads);
   } catch (error) {
-    logger.error(error.response.data.error.message);
-    return res.status(500).json({ success: false, message: 'Internal server error' })
-  }
-
-  res.status(200).json(campaign);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  };
 });
 
 module.exports = router;
