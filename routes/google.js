@@ -131,7 +131,7 @@ router.post("/google/ads", auth, checkStoreExistence, async (req, res) => {
     return res.status(400).send('Start date and end date must be set');
   };
 
-  const startDate = start.split("T")[0];  
+  const startDate = start.split("T")[0];
   const endDate = end.split("T")[0];
 
   try {

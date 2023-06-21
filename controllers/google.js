@@ -28,7 +28,7 @@ class GoogleController {
 	async createGoogleAdsAccount(account) {
 		try {
 			await this.redisClient.hset(`google_ads_account:${account.storeId}`, account);
-			logger.info(`Google Ads account for '${account.storeId}' persisted`);
+			logger.info(`Google Ads account hash '${account.storeId}' persisted`);
 		} catch (error) {
 			logger.error(error);
 			throw error;
