@@ -1,8 +1,6 @@
 const router = require('express').Router();
-const { User } = require('../models/User');
 const { decrypt } = require('../utils/crypto');
 const logger = require('../utils/logger');
-const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const axios = require('axios');
 const { differenceInDays, parseISO } = require('date-fns');
 const { redisClient } = require('../om/redisClient');
@@ -52,42 +50,13 @@ router.get("/facebook/callback", auth, async (req, res) => {
     });
 });
 
-
 //Rota para buscar as contas administradas pelo usuário que fez o login, usamos o facebook_access_token do usuário logado para fazer a busca.
 router.get("/facebook/accounts", auth, storeExists, async (req, res) => {
   try {
     const { store } = req.query;
-    const token = await redisClient.hget(`store:${store}`, 'fb_token');
-
-    if (!token) {
-      return res.status(403).json({ success: false, message: 'User cannot perform this type of query on behalf of this store' });
-    }
-
-    let allAccounts = [];
-    let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/me/adaccounts?fields=name%2Cid%2Caccount_id&access_token=${token}`;
-
-    while (url) {
-      const { data: accounts } = await axios.get(url);
-      allAccounts = allAccounts.concat(accounts.data);
-      url = accounts.paging.next;
-    }
-
-    allAccounts.sort((a, b) => {
-      const nameA = a.name.toUpperCase();
-      const nameB = b.name.toUpperCase();
-
-      if (nameA < nameB) {
-        return -1;
-      } else if (nameA > nameB) {
-        return 1;
-      } else {
-        return 0;
-      }
-    });
-
-    return res.status(200).json(allAccounts);
+    const accounts = facebookController.fetchFacebookAccountList(store);
+    return res.status(200).json(accounts);
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, message: 'Internal server error' });
   };
 });
@@ -105,8 +74,7 @@ router.get("/facebook/accounts", auth, storeExists, async (req, res) => {
 // ]
 router.post("/facebook/account/connect", auth, storeExists, async (req, res) => {
   const { account, store } = req.body;
-
-  if (!(account && store)) {
+  if (!(account)) {
     return res.status(400).json({ success: false, message: 'Invalid request body' });
   };
 
@@ -116,35 +84,20 @@ router.post("/facebook/account/connect", auth, storeExists, async (req, res) => 
       success: true, message: `Facebook Ads account ${account.name} added to ${store}`
     });
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   };
 });
 
-router.get("/facebook/account/disconnect", auth, checkStoreExistence, async (req, res) => {
-  const { store } = req.query;
-
-  if (!store) {
-    return res.status(400).json({ success: false, message: 'Invalid request query' })
+router.get("/facebook/account/disconnect", auth, storeExists, async (req, res) => {
+  try {
+    const { store } = req.query;
+    await facebookController.deleteFacebookAdsAccount(store);
+    return res.status(201).json({
+      success: true, message: `Facebook Ads account disconnected from '${store}'`
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   };
-  User.findOneAndUpdate(
-    { _id: req.user._id, "shops.name": store },
-    {
-      $unset: {
-        "shops.$.facebook_business": 1,
-        "shops.$.facebook_access_token": 1
-      },
-    },
-    { new: true },
-    (err, user) => {
-      if (err) {
-        logger.error(err);
-        return res.status(500).json({ success: false, message: 'Internal server error' });
-      } else {
-        res.status(204).json({ success: true, message: `Removed Facebook Ads account from ${store}` });
-      }
-    }
-  );
 });
 
 //Rota para buscar os gastos, e o roas de uma conta no facebook business
