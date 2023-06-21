@@ -1,14 +1,11 @@
 const router = require('express').Router();
-const { User } = require('../models/User');
 const logger = require('../utils/logger');
-const { checkAuth, checkStoreExistence } = require('../utils/middleware');
+const { storeExists } = require('../middleware/store');
 const { auth } = require('../middleware/auth');
 const { google } = require('googleapis');
 const { GoogleAdsApi } = require('google-ads-api');
-const { differenceInDays, parseISO } = require('date-fns');
 const { redisClient } = require('../om/redisClient');
 const GoogleController = require('../controllers/google');
-const { storeExists } = require('../middleware/store');
 const axios = require('axios');
 
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URL, TOKEN_GOOGLE } = process.env;
@@ -87,7 +84,7 @@ router.post("/google/account/connect", auth, storeExists, async (req, res) => {
 });
 
 //Disconnects google account from a user's shop
-router.get('/google/account/disconnect', auth, checkStoreExistence, async (req, res) => {
+router.get('/google/account/disconnect', auth, storeExists, async (req, res) => {
   try {
     const { store } = req.query;
     await googleController.deleteGoogleAdsAcccount(store);
@@ -100,7 +97,7 @@ router.get('/google/account/disconnect', auth, checkStoreExistence, async (req, 
 });
 
 //Gets all Google Ads account associated with authorized Google account
-router.get('/google/accounts', auth, checkStoreExistence, async (req, res) => {
+router.get('/google/accounts', auth, storeExists, async (req, res) => {
   try {
     const { store } = req.query;
     const accounts = await googleController.fetchGoogleAdsAccountList(store);
@@ -110,7 +107,7 @@ router.get('/google/accounts', auth, checkStoreExistence, async (req, res) => {
   }
 });
 
-router.post("/google/ads", auth, checkStoreExistence, async (req, res) => {
+router.post("/google/ads", auth, storeExists, async (req, res) => {
   const { start, end, store } = req.body;
 
   if (!start && !end) {

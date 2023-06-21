@@ -104,7 +104,7 @@ router.get("/facebook/account/disconnect", auth, storeExists, async (req, res) =
 //Rota para buscar os gastos, e o roas de uma conta no facebook business
 // Tem que ser enviado o id da loja, a rota usa o access token do usuario a rota usa o access token do usuário ao id do das cotas administradas pelo usuário logado 
 // O startDate e o endDate tem que ser enviados no padrão yyyy-mm-dd
-router.post("/facebook/ads", auth, async (req, res) => {
+router.post("/facebook/ads", auth, storeExists, async (req, res) => {
   const { store, start, end } = req.body;
   if (!store) {
     return res.status(400).send('Invalid request body, missing store')
