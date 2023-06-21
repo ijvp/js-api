@@ -90,25 +90,12 @@ router.post("/google/account/connect", auth, storeExists, async (req, res) => {
 //Disconnects google account from a user's shop
 router.get('/google/account/disconnect', auth, checkStoreExistence, async (req, res) => {
   try {
-    const userId = req.session.userId;
-    const store = req.method === 'POST' ? req.body.store : req.query.store;
-
-    const userStores = await redisClient.smembers(`user_stores:${userId}`);
-    const found = userStores.find(store => store === store);
-    if (found) {
-      await redisClient.hdel(`store:${store}`, 'googleAccessToken');
-      await redisClient.hdel(`store:${store}`, 'googleRefreshToken');
-      await redisClient.del(`google_ads_account:${store}`)
-
-      return res.status(201).json({
-        success: true, message: `Google Ads account disconnected from ${store}`
-      });
-    } else {
-      return res.status(404).json({ success: false, error: "Store not found" })
-    };
-
+    const { store } = req.query;
+    await googleController.deleteGoogleAdsAcccount(store);
+    return res.status(201).json({
+      success: true, message: `Google Ads account disconnected from '${store}'`
+    });
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   };
 });

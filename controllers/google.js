@@ -13,28 +13,6 @@ class GoogleController {
 		this.googleClient = client;
 	}
 
-	async getGoogleAdsAccountByStoreId(storeId) {
-		try {
-			const googleAdsAccount = await this.redisClient.hgetall(
-				`google_ads_account:${storeId}`
-			);
-			return googleAdsAccount;
-		} catch (error) {
-			logger.error('Error retrieving Google Ads Account: %s', error);
-			throw error;
-		};
-	};
-
-	async createGoogleAdsAccount(account) {
-		try {
-			await this.redisClient.hset(`google_ads_account:${account.storeId}`, account);
-			logger.info(`Google Ads account hash '${account.storeId}' persisted`);
-		} catch (error) {
-			logger.error(error);
-			throw error;
-		}
-	};
-
 	async grantGoogleAccessToStore(storeId, tokens) {
 		try {
 			await this.redisClient.hmset(`store:${storeId}`, {
@@ -99,6 +77,39 @@ class GoogleController {
 			});
 
 			return accounts;
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
+
+	async getGoogleAdsAccountByStoreId(storeId) {
+		try {
+			const googleAdsAccount = await this.redisClient.hgetall(
+				`google_ads_account:${storeId}`
+			);
+			return googleAdsAccount;
+		} catch (error) {
+			logger.error('Error retrieving Google Ads Account: %s', error);
+			throw error;
+		};
+	};
+
+	async createGoogleAdsAccount(account) {
+		try {
+			await this.redisClient.hset(`google_ads_account:${account.storeId}`, account);
+			logger.info(`Google Ads account hash '${account.storeId}' persisted`);
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
+
+	async deleteGoogleAdsAcccount(storeId) {
+		try {
+			await this.redisClient.del(`google_ads_account:${storeId}`);
+			logger.info(`Google Ads account hash '${storeId}' deleted`);
+			await this.revokeGoogleAccessFromStore(storeId);
 		} catch (error) {
 			logger.error(error);
 			throw error;
