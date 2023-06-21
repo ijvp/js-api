@@ -82,7 +82,6 @@ router.post("/google/account/connect", auth, storeExists, async (req, res) => {
       success: true, message: `Google Ads account ${account.name} added to ${store}`
     });
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

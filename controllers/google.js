@@ -17,7 +17,8 @@ class GoogleController {
 		try {
 			await this.redisClient.hmset(`store:${storeId}`, {
 				googleAccessToken: tokens.access_token,
-				googleRefreshToken: tokens.refresh_token
+				googleRefreshToken: tokens.refresh_token,
+				expiryDate: tokens.expiry_date
 			});
 			logger.info(`Granted store '${storeId}' access to Google APIs`);
 		} catch (error) {
