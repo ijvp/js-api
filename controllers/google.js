@@ -62,24 +62,29 @@ class GoogleController {
 		try {
 			const token = await this.redisClient.hget(`store:${storeId}`, 'googleRefreshToken');
 			const { resource_names } = await this.googleClient.listAccessibleCustomers(token);
-			const accounts = await Promise.all(resource_names.map(async resourceName => {
+			let accounts = await Promise.all(resource_names.map(async resourceName => {
 				const customerId = resourceName.split('customers/')[1];
 				const customer = this.googleClient.Customer({
 					customer_id: customerId,
 					refresh_token: token
 				});
 
-				const response = await customer.report({
-					entity: 'customer_client',
-					attributes: ['customer_client.id', 'customer_client.resource_name', 'customer_client.descriptive_name']
-				});
+				try {
+					const response = await customer.report({
+						entity: 'customer_client',
+						attributes: ['customer_client.id', 'customer_client.resource_name', 'customer_client.descriptive_name']
+					});
 
-				// when returning manager account, it will have several entries with different customer_clients
-				// we want the manager account itself, otherwise descriptive_name is null;
-				const { customer_client } = response.find(account => account.customer_client.id.toString() === customerId);
-				return customer_client;
+					// when returning manager account, it will have several entries with different customer_clients
+					// we want the manager account itself, otherwise descriptive_name is null;
+					const { customer_client } = response.find(account => account.customer_client.id.toString() === customerId);
+					return customer_client;
+				} catch (error) {
+					return;
+				}
 			}));
 
+			accounts = accounts.filter(account => !!account);
 			accounts.sort((a, b) => {
 				const nameA = a.descriptive_name.toUpperCase();
 				const nameB = b.descriptive_name.toUpperCase();
