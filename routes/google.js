@@ -117,7 +117,11 @@ router.post("/google/ads", auth, storeExists, async (req, res) => {
   const endDate = end.split("T")[0];
 
   try {
-    const response = await axios.post(`${process.env.PYEND_URL}/google/ads?store=${store}&start=${startDate}&end=${endDate}`)
+    const response = await axios.post(`${process.env.PYEND_URL}/google/ads`, {
+      store: store,
+      start: startDate,
+      end: endDate
+    })
 
     return res.status(200).send(response.data)
   } catch (error) {
