@@ -10,7 +10,6 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-
 # Copy the rest of the application code to the container
 COPY . .
 
@@ -18,4 +17,4 @@ COPY . .
 EXPOSE 8080
 
 # Start the Node.js application with pm2
-CMD ["npm", "run" "start"]
+CMD ["npm", "run", "start"]
