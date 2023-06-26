@@ -42,10 +42,6 @@ jobs:
           sudo apt-get update && sudo apt-get -y install curl jq
           curl https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl -o /usr/local/bin/lightsailctl
           chmod +x /usr/local/bin/lightsailctl
-          
-      - name: Install pm2
-        run: |
-          sudo npm install -g pm2
 
       - name: Release to Amazon Lightsail
         env:
