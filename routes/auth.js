@@ -34,15 +34,21 @@ router.post('/auth/register', async (req, res) => {
 
 router.post('/auth/login', async (req, res) => {
 	const { username, password } = req.body;
-	const found = await User.findOne({ username });
-	const passwordsMatch = await found.matchesPassword(password);
 
-	if (!found || !passwordsMatch) {
-		return res.status(401).json({ success: false, message: 'Invalid username/password' })
+	try {
+		const found = await User.findOne({ username });
+		const passwordsMatch = await found?.matchesPassword(password);
+
+		if (!found || !passwordsMatch) {
+			return res.status(401).json({ success: false, message: 'Invalid username/password' });
+		}
+
+		await logIn(req, found.id);
+		res.json({ success: true, message: "User logged in" });
+	} catch (error) {
+		logger.error(error);
+		return res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
-
-	await logIn(req, found.id);
-	res.json({ success: true, message: "User logged in" });
 });
 
 router.post('/auth/update', auth, async (req, res) => {

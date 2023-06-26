@@ -11,7 +11,6 @@ const guest = (req, res, next) => {
 
 const auth = (req, res, next) => {
 	if (!isLoggedIn(req)) {
-		logger.info("ENDPOINT", req.path, req.session)
 		return next(new Error('You must be logged in'))
 	}
 
