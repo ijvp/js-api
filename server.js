@@ -16,6 +16,7 @@ const shopifyRoutes = require('./routes/shopify');
 const googleRoutes = require('./routes/google');
 const facebookRoutes = require('./routes/facebook');
 const userRoutes = require('./routes/user');
+const gdprRoutes = require('./routes/gdpr');
 
 // utils
 const connect = require('./utils/connect');
@@ -88,6 +89,7 @@ app.use('/', shopifyRoutes);
 app.use('/', googleRoutes);
 app.use('/', facebookRoutes);
 app.use('/', userRoutes);
+app.use('/', gdprRoutes);
 
 app.listen(port, () => {
 	logger.info('NODE ENV: %s', process.env.NODE_ENV);

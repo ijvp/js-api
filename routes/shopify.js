@@ -1,7 +1,6 @@
 const router = require('express').Router();
-const axios = require('axios');
 const logger = require('../utils/logger');
-const { getStoreApiURL, getStoreFrontApiURL, getMetrics, extractHttpsUrl, getSessionFromStorage } = require('../utils/shop');
+const { getMetrics, getSessionFromStorage } = require('../utils/shop');
 const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const { auth } = require('../middleware/auth');
 const shopify = require('../om/shopifyClient');
