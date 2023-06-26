@@ -10,8 +10,6 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Install pm2 globally
-RUN npm install pm2 -g
 
 # Copy the rest of the application code to the container
 COPY . .
@@ -20,4 +18,4 @@ COPY . .
 EXPOSE 8080
 
 # Start the Node.js application with pm2
-CMD ["pm2", "start" "app.js"]
+CMD ["npm", "run" "start"]
