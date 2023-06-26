@@ -11,7 +11,7 @@ const StoreController = require('../controllers/store');
 const storeController = new StoreController(redisClient);
 
 router.get('/shopify/authorize', auth, (req, res) => {
-	const redirectUri = `${process.env.BACKEND_URL}${shopify.config.auth.callbackPath}`;
+	const redirectUri = `${process.env.URL}${shopify.config.auth.callbackPath}`;
 	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${process.env.SHOPIFY_API_KEY}&redirect_uri=${redirectUri}&scope=${process.env.SHOPIFY_SCOPES}`);
 	return res.status(200).json(authorizationUrl);
 });
