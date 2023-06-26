@@ -19,7 +19,7 @@ router.delete('/user/store', auth, checkStoreExistence, async (req, res) => {
 	try {
 		const { store } = req.query;
 		const { userId } = req.session;
-		await storeController.deleteStoreData(userId, store);
+		await storeController.deleteStoreData(store, userId);
 		res.json({
 			success: true, message: `Store '${store}' data deleted successfully }`
 		})

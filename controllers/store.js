@@ -190,12 +190,12 @@ class StoreController {
 		};
 	};
 
-	async deleteStoreData(userId, storeId) {
+	async deleteStoreData(storeId, userId) {
 		try {
 			await this.redisClient.del(`facebook_ads_account:${storeId}`);
 			await this.redisClient.del(`google_ads_account:${storeId}`);
 			await this.redisClient.del(`store:${storeId}`);
-			await this.redisClient.srem(`user_stores:${userId}`, storeId);
+			userId && await this.redisClient.srem(`user_stores:${userId}`, storeId);
 		} catch (error) {
 			logger.error(`Failed to delete data for store '${store}': %s`, error);
 			throw error;
