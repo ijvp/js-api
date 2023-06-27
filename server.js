@@ -1,3 +1,5 @@
+logger.info(process.env.REDIS_HOST)
+
 // packages
 require('dotenv').config();
 require('@shopify/shopify-api/adapters/node');
@@ -92,7 +94,6 @@ app.use('/', userRoutes);
 app.use('/', gdprRoutes);
 
 app.listen(port, () => {
-	logger.info(process.env.REDIS_HOST)
 	logger.info('NODE ENV: %s', process.env.NODE_ENV);
 	logger.info('Server running on port %d', port);
 	connect();
