@@ -2,15 +2,6 @@ const logger = require('../utils/logger');
 const { getStoreApiURL, extractHttpsUrl } = require('../utils/shop');
 const axios = require('axios');
 
-const arrayToObject = (arr) => {
-	const result = {};
-	for (const [key, value] of arr) {
-		result[key] = value;
-	}
-
-	return result;
-};
-
 class StoreController {
 	constructor(redisClient) {
 		this.redisClient = redisClient;
@@ -20,16 +11,6 @@ class StoreController {
 		try {
 			const storeIds = await this.redisClient.smembers(`user_stores:${userId}`);
 			return storeIds;
-			// const stores = [];
-
-			// for (const storeId of storeIds) {
-			// 	const store = await this.redisClient.hgetall(`stores:${storeId}`);
-			// 	if (store) {
-			// 		stores.push(store);
-			// 	}
-			// }
-
-			// return stores;
 		} catch (error) {
 			logger.error('Error retrieving stores by user ID: %s', error);
 			throw error;

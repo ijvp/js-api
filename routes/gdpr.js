@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const logger = require('../utils/logger');
-const { redisClient } = require('../om/redisClient');
+const redisClient = require('../clients').redisClient;
 const StoreController = require('../controllers/store');
 
 const storeController = new StoreController(redisClient);

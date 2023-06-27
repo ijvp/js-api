@@ -1,13 +1,12 @@
 const router = require('express').Router();
 const logger = require('../utils/logger');
 const { getMetrics, getSessionFromStorage } = require('../utils/shop');
-const { checkAuth, checkStoreExistence } = require('../utils/middleware');
 const { auth } = require('../middleware/auth');
-const shopify = require('../om/shopifyClient');
-const { redisClient } = require('../om/redisClient');
+const { storeExists } = require('../middleware/store');
+const { shopify, redis } = require('../clients');
 const StoreController = require('../controllers/store');
 
-const storeController = new StoreController(redisClient);
+const storeController = new StoreController(redis.redisClient);
 
 router.get('/shopify/authorize', auth, (req, res) => {
 	const redirectUri = `${process.env.URL}${shopify.config.auth.callbackPath}`;
@@ -48,7 +47,7 @@ router.get(shopify.config.auth.callbackPath, async (req, res) => {
 //currently only returns paid orders
 //parameters: store: String, start (Date), end (Date), granularity: 'day' | 'hour',
 //triplewhale additional parameters: match? [], metricsBreakdown: boolean, shopId (shop.name)
-router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
+router.post('/shopify/orders', auth, storeExists, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
 
 	if (!(store && start && granularity)) {
@@ -64,7 +63,7 @@ router.post('/shopify/orders', auth, checkStoreExistence, async (req, res) => {
 	};
 });
 
-router.post('/shopify/abandoned-checkouts', auth, checkStoreExistence, async (req, res) => {
+router.post('/shopify/abandoned-checkouts', auth, storeExists, async (req, res) => {
 	const { store, start, end, granularity } = req.body;
 
 	if (!(store && start && granularity)) {
@@ -93,7 +92,7 @@ router.post('/shopify/most-wanted', auth, async (req, res) => {
 	};
 });
 
-router.post('/shopify/product', checkAuth, async (req, res) => {
+router.post('/shopify/product', auth, async (req, res) => {
 	const { store, productId } = req.body;
 	if (!productId) {
 		return res.status(400).json({ success: false, message: 'Invalid request body, missing product id' })

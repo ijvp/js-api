@@ -1,9 +1,10 @@
-const { redisClient } = require('../om/redisClient');
+const { redis } = require('../clients');
 const { auth } = require('../middleware/auth');
+const { storeExists } = require('../middleware/store')
 const router = require('express').Router();
 const StoreController = require('../controllers/store');
-const { checkStoreExistence } = require('../utils/middleware');
 
+const { redisClient } = redis;
 const storeController = new StoreController(redisClient);
 
 router.get('/user/stores', auth, async (req, res) => {
@@ -15,7 +16,7 @@ router.get('/user/stores', auth, async (req, res) => {
 	}
 });
 
-router.delete('/user/store', auth, checkStoreExistence, async (req, res) => {
+router.delete('/user/store', auth, storeExists, async (req, res) => {
 	try {
 		const { store } = req.query;
 		const { userId } = req.session;

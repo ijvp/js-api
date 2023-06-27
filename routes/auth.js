@@ -1,19 +1,9 @@
 const router = require('express').Router();
-const passport = require('passport');
 const logger = require('../utils/logger');
-const { logIn, logOut } = require('../utils/user');
+const { logIn, logOut } = require('../utils/session');
 const { encrypt } = require('../utils/crypto');
 const { User } = require('../models/User');
 const { auth } = require('../middleware/auth');
-const { redirectOutOfApp } = require('../om/shopifyClient');
-
-// passport.use(User.createStrategy());
-// passport.use(new LocalStrategy(User.authenticate()))
-// passport.serializeUser((user, done) => done(null, user.id));
-
-// passport.deserializeUser((id, done) => {
-// 	User.findById(id, (err, user) => done(err, user));
-// });
 
 router.post('/auth/register', async (req, res) => {
 	const { username, password } = req.body;

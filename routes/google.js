@@ -3,11 +3,11 @@ const logger = require('../utils/logger');
 const { storeExists } = require('../middleware/store');
 const { auth } = require('../middleware/auth');
 const { google } = require('googleapis');
-const { GoogleAdsApi } = require('google-ads-api');
-const { redisClient } = require('../om/redisClient');
+const { redis } = require('../clients');
 const GoogleController = require('../controllers/google');
 const axios = require('axios');
 
+const { redisClient } = redis;
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URL, TOKEN_GOOGLE } = process.env;
 
 const googleController = new GoogleController(redisClient);
@@ -17,12 +17,6 @@ const oauth2Client = new google.auth.OAuth2(
   `${GOOGLE_CLIENT_SECRET}`,
   `${GOOGLE_REDIRECT_URL}`
 );
-
-const client = new GoogleAdsApi({
-  client_id: `${process.env.GOOGLE_CLIENT_ID}`,
-  client_secret: `${process.env.GOOGLE_CLIENT_SECRET}`,
-  developer_token: `${process.env.GOOGLE_MANAGE_TOKEN}`,
-});
 
 //Generate google oAuth url and send it back to the client
 //and send the selected store in state variable

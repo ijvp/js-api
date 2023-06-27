@@ -1,7 +1,8 @@
 const Decimal = require('decimal.js');
-const { redisClient } = require("../om/redisClient");
-const shopify = require("../om/shopifyClient");
+const { shopify, redis } = require("../clients");
 const logger = require('../utils/logger');
+
+const { redisClient } = redis;
 
 const getMetrics = (items, granularity) => {
 	const metrics = new Map();

@@ -1,5 +1,4 @@
-const { isLoggedIn } = require("../utils/user")
-const logger = require('../utils/logger');
+const { isLoggedIn } = require("../utils/session")
 
 const guest = (req, res, next) => {
 	if (isLoggedIn(req)) {

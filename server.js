@@ -1,5 +1,3 @@
-console.log(process.env.REDIS_HOST)
-
 // packages
 require('dotenv').config();
 require('@shopify/shopify-api/adapters/node');
@@ -7,10 +5,9 @@ const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
-const MongoStore = require('connect-mongo');
 
 //modules
-const { redisStore } = require('./om/redisClient');
+const { redisStore } = require('./clients');
 
 // routes
 const authRoutes = require('./routes/auth');
@@ -53,23 +50,22 @@ const whitelist = [
 ];
 const corsOptions = {
 	credentials: true,
-	origin: true
-	// origin: function (origin, callback) {
-	// 	//TODO: test this line and other corsOption.req middleware
-	// 	const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
-	// 	if (forwardedHost === process.env.FRONTEND_URL) {
-	// 		callback(null, true);
-	// 	}
-	// 	//Postman bypass for local development since it has no origin
-	// 	else if (!origin) {
-	// 		callback(null, true);
-	// 	}
-	// 	else if (whitelist.indexOf(origin) !== -1) {
-	// 		callback(null, true)
-	// 	} else {
-	// 		callback(new Error('Not allowed by CORS', origin))
-	// 	}
-	// }
+	origin: function (origin, callback) {
+		//TODO: test this line and other corsOption.req middleware
+		const forwardedHost = (corsOptions.req && corsOptions.req.headers["x-forwarded-host"]) || "";
+		if (forwardedHost === process.env.FRONTEND_URL) {
+			callback(null, true);
+		}
+		//Postman bypass for local development since it has no origin
+		else if (!origin) {
+			callback(null, true);
+		}
+		else if (whitelist.indexOf(origin) !== -1) {
+			callback(null, true)
+		} else {
+			callback(new Error('Not allowed by CORS', origin))
+		}
+	}
 };
 app.use((req, res, next) => {
 	corsOptions.req = req;

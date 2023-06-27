@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
-const { redisClient } = require('../om/redisClient');
+const { redis } = require('../clients');
+const { redisClient } = redis;
 
 const storeExists = async (req, res, next) => {
 	const store = req.method === 'POST' ? req.body.store : req.query.store;

@@ -1,11 +1,12 @@
 const router = require('express').Router();
 const logger = require('../utils/logger');
 const axios = require('axios');
-const { redisClient } = require('../om/redisClient');
+const { redis } = require('../clients');
 const FacebookController = require('../controllers/facebook');
 const { auth } = require('../middleware/auth');
 const { storeExists } = require('../middleware/store');
 
+const { redisClient } = redis;
 const facebookController = new FacebookController(redisClient);
 
 //Login facebook, quando usuário finalizar login chama a rota callback
