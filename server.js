@@ -1,4 +1,4 @@
-logger.info(process.env.REDIS_HOST)
+console.log(process.env.REDIS_HOST)
 
 // packages
 require('dotenv').config();
