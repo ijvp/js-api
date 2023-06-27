@@ -64,6 +64,7 @@ class GoogleController {
 			}));
 
 			accounts = accounts.filter(account => !!account);
+			accounts = accounts.filter(account => account.descriptive_name);
 			accounts.sort((a, b) => {
 				const nameA = a.descriptive_name.toUpperCase();
 				const nameB = b.descriptive_name.toUpperCase();
