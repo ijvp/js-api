@@ -16,5 +16,5 @@ COPY . .
 # Expose the port that the API will run on
 EXPOSE 8080
 
-# Start the Node.js application with pm2
+# Start the Node.js application
 CMD ["npm", "run", "start"]
