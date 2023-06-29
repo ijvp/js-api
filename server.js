@@ -84,6 +84,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // App routes config
+app.get('/health', (req, res) => {
+	return res.status(200).send('ok');
+})
+
 app.use('/', authRoutes);
 app.use('/', shopifyRoutes);
 app.use('/', googleRoutes);
