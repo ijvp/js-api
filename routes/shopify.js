@@ -4,6 +4,7 @@ const { getMetrics, getSessionFromStorage } = require('../utils/shop');
 const { auth } = require('../middleware/auth');
 const { storeExists } = require('../middleware/store');
 const { shopify, redis } = require('../clients');
+const { encrypt } = require('../utils/crypto');
 const StoreController = require('../controllers/store');
 
 const storeController = new StoreController(redis.redisClient);
@@ -14,7 +15,10 @@ router.get('/shopify/authorize', auth, (req, res) => {
 	return res.status(200).json(authorizationUrl);
 });
 
-router.get(shopify.config.auth.path, shopify.auth.begin());
+router.get(shopify.config.auth.path, (req, res) => {
+	const { shop, hmac, timestamp } = req.query;
+	res.redirect(`//${shop}/admin/oauth/authorize?client_id=${process.env.SHOPIFY_API_KEY}&scope=${process.env.SHOPIFY_SCOPES}&redirect_uri=${process.env.URL}${shopify.config.auth.callbackPath}&state=0978142396815234`)
+});
 
 router.get(shopify.config.auth.callbackPath, async (req, res) => {
 	try {
@@ -29,15 +33,16 @@ router.get(shopify.config.auth.callbackPath, async (req, res) => {
 
 		await storeController.createStore(store);
 
-		// TODO: shopify oAuth flow when user installs app 
-		// before registering TurboDash account.
-		// How to keep storeRef and associate user at a
-		// later point?
 		if (req.session.userId) {
 			await storeController.associateStoreWithUser(store.name, req.session.userId);
-		};
+			return res.redirect(process.env.FRONTEND_URL);
+		} else {
+			// encripta nome da loja, redireciona para pagina de registrar usuario
+			// ao mandar a requisição para /auth/register, decripta e chama
+			// associateStoreWithUser com id do usua'rio novo
+			return res.redirect(`${process.env.FRONTEND_URL}/register?guid=${encodeURIComponent(encrypt(shop))}`);
+		}
 
-		return res.redirect(process.env.FRONTEND_URL);
 	} catch (error) {
 		logger.error(error);
 		res.redirect(`${process.env.FRONTEND_URL}?shopify-install-error=true`);
