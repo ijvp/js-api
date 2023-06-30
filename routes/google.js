@@ -107,17 +107,21 @@ router.post("/google/ads", auth, storeExists, async (req, res) => {
     return res.status(400).send('Start date and end date must be set');
   };
 
-  const startDate = start.split("T")[0];
-  const endDate = end.split("T")[0];
-
   try {
     const response = await axios.post(`${process.env.PYEND_URL}/google/ads`, {
       store: store,
-      start: startDate,
-      end: endDate
+      start,
+      end
     })
 
-    return res.status(200).send(response.data)
+
+    // tem que reordenar aqui por algum motivo, mesmo o python devolvendo em ordem...
+    return res.status(200).send({
+      ...response.data, metricsBreakdown: response.data.metricsBreakdown.sort((a, b) => {
+        return new Date(a.date) - new Date(b.date);
+      })
+    });
+
   } catch (error) {
     logger.error(error);
     return res.status(500).json({ success: false, message: 'Internal server error' });

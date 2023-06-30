@@ -112,7 +112,11 @@ router.post("/facebook/ads", auth, storeExists, async (req, res) => {
 
   try {
     const ads = await facebookController.fetchFacebookAds(store, start, end);
-    return res.status(200).json(ads);
+    return res.status(200).send({
+      ...ads, metricsBreakdown: ads.metricsBreakdown.sort((a, b) => {
+        return new Date(a.date) - new Date(b.date);
+      })
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Internal server error' });
   };
