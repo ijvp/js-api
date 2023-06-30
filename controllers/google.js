@@ -59,6 +59,7 @@ class GoogleController {
 					const { customer_client } = response.find(account => account.customer_client.id.toString() === customerId);
 					return customer_client;
 				} catch (error) {
+					logger.error(error.message);
 					return;
 				}
 			}));
