@@ -6,3 +6,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - '6379:6379'
+    networks:
+      - dashboard-network
+    container_name: redis
+
+networks:
+  dashboard-network:
+    external:
+      name: dashboard-network

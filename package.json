@@ -7,8 +7,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "export NODE_ENV=development && nodemon server.js",
     "start": "node server.js",
-    "docker": "docker-compose up",
-    "redis": "docker-compose -f docker/docker-compose.yml up -d"
+    "docker": "docker network create dashboard-network && docker-compose -f docker/docker-compose.yml up --build -d && docker-compose up",
+    "dockerDown": "docker-compose down && docker-compose -f docker/docker-compose.yml down && docker network rm dashboard-network",
+    "redis": "docker-compose -f docker/docker-compose.yml up -d",
+    "redisDown": "docker-compose -f docker/docker-compose.yml down"
   },
   "keywords": [],
   "author": "",
