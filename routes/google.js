@@ -15,13 +15,22 @@ const googleController = new GoogleController(redisClient);
 const oauth2Client = new google.auth.OAuth2(
   `${GOOGLE_CLIENT_ID}`,
   `${GOOGLE_CLIENT_SECRET}`,
-  `${GOOGLE_REDIRECT_URL}`
 );
+
+const GOOGLE_SCOPES = {
+  'google-ads': 'https://www.googleapis.com/auth/adwords',
+  'google-analytics': 'https://www.googleapis.com/auth/analytics.readonly'
+};
+
+router.get('/google/supported-apis', (req, res) => {
+  const apis = google.getSupportedAPIs();
+  return res.json(apis);
+});
 
 //Generate google oAuth url and send it back to the client
 //and send the selected store in state variable
 router.get('/google/authorize', auth, async (req, res) => {
-  const { store } = req.query;
+  const { store, service } = req.query;
   if (!store) {
     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
   }
@@ -30,34 +39,53 @@ router.get('/google/authorize', auth, async (req, res) => {
     access_type: 'offline',
     prompt: 'consent',
     scope: [
-      'https://www.googleapis.com/auth/adwords'
+      GOOGLE_SCOPES.service
     ],
     state: store,
-    include_granted_scopes: true
+    include_granted_scopes: true,
+    redirect_uri: `${process.env.URL}/${service}/callback`
   });
 
   return res.status(200).json(redirect);
 });
 
-//Associate access and refresh tokens to a store, which is sent
-//back in the state
-router.get('/google/callback', auth, (req, res) => {
+// Associate google ads access and refresh tokens to a store
+router.get('/google-ads/callback', auth, (req, res) => {
   const { code, state: shop } = req.query;
 
   oauth2Client.getToken(code, async (error, token) => {
     if (error) {
-      return res.status(400).json({ success: false, error });
+      return res.status(500).json({ success: false, error });
     };
 
     try {
-      await googleController.grantGoogleAccessToStore(shop, token);
-      return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google&store=${shop}`);
+      await googleController.grantGoogleAdsAccessToStore(shop, token);
+      return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google-ads&store=${shop}`);
     } catch (error) {
       logger.error(error);
       return res.status(500).json({ success: false, message: "Internal Server Error" })
     }
   });
 });
+
+// Associate google analytics access and refresh tokens to a store
+router.get('/google-analytics/callback', auth, (req, res) => {
+  const { code, state: shop } = req.query;
+
+  oauth2Client.getToken(code, async (error, token) => {
+    if (error) {
+      return res.status(500).json({ success: false, error });
+    };
+
+    try {
+      await googleController.grantGoogleAnalyticsAccessToStore(shop, token);
+      return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google-analytics&store=${shop}`);
+    } catch (error) {
+      logger.error(error);
+      return res.status(500).json({ success: false, message: "Internal Server Error" })
+    }
+  });
+})
 
 //Connect a google account to one of the users shops
 router.post("/google/account/connect", auth, storeExists, async (req, res) => {
@@ -108,7 +136,7 @@ router.post("/google/ads", auth, storeExists, async (req, res) => {
   };
 
   try {
-    const response = await axios.post(`${process.env.PYEND_URL}/google/ads`, {
+    const response = await axios.post(`${process.env.PYEND_URL} / google / ads`, {
       store: store,
       start,
       end

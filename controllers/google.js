@@ -13,14 +13,27 @@ class GoogleController {
 		this.googleClient = client;
 	}
 
-	async grantGoogleAccessToStore(storeId, tokens) {
+	async grantGoogleAdsAccessToStore(storeId, tokens) {
 		try {
 			await this.redisClient.hmset(`store:${storeId}`, {
-				googleAccessToken: tokens.access_token,
-				googleRefreshToken: tokens.refresh_token,
+				googleAdsAccessToken: tokens.access_token,
+				googleAdsRefreshToken: tokens.refresh_token,
 				expiryDate: tokens.expiry_date
 			});
-			logger.info(`Granted store '${storeId}' access to Google APIs`);
+			logger.info(`Granted store '${storeId}' access to Google Ads API`);
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
+
+	async grantGoogleAnalyticsAccessToStore(storeId, tokens) {
+		try {
+			await this.redisClient.hmset(`store:${storeId}`, {
+				googleAnalyticsAccessToken: tokens.access_token,
+				expiryDate: tokens.expiry_date
+			});
+			logger.info(`Granted store '${storeId}' access to Google Analytics API`);
 		} catch (error) {
 			logger.error(error);
 			throw error;
