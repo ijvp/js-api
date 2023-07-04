@@ -1,36 +1,55 @@
 const { GoogleAdsApi } = require('google-ads-api');
+const { google } = require('googleapis');
 const logger = require('../utils/logger');
 
-const client = new GoogleAdsApi({
+const googleAds = new GoogleAdsApi({
 	client_id: `${process.env.GOOGLE_CLIENT_ID}`,
 	client_secret: `${process.env.GOOGLE_CLIENT_SECRET}`,
 	developer_token: `${process.env.GOOGLE_MANAGE_TOKEN}`,
 });
 
+const googleAnalytics = google.analyticsreporting('v4');
+
 class GoogleController {
 	constructor(redisClient) {
 		this.redisClient = redisClient;
-		this.googleClient = client;
+		this.googleAds = googleAds;
+		this.googleAnalytics = googleAnalytics;
 	}
 
-	async grantGoogleAccessToStore(storeId, tokens) {
+	async grantGoogleAdsAccessToStore(storeId, tokens) {
 		try {
 			await this.redisClient.hmset(`store:${storeId}`, {
-				googleAccessToken: tokens.access_token,
-				googleRefreshToken: tokens.refresh_token,
-				expiryDate: tokens.expiry_date
+				googleAdsAccessToken: tokens.access_token,
+				googleAdsRefreshToken: tokens.refresh_token,
+				googleAdsExpiryDate: tokens.expiry_date
 			});
-			logger.info(`Granted store '${storeId}' access to Google APIs`);
+			logger.info(`Granted store '${storeId}' access to Google Ads API`);
 		} catch (error) {
 			logger.error(error);
 			throw error;
 		}
 	};
 
-	async revokeGoogleAccessFromStore(storeId) {
+	async grantGoogleAnalyticsAccessToStore(storeId, tokens) {
+		console.log("GOOGLE ANALYTICS TOKENS", tokens);
 		try {
-			await this.redisClient.hdel(`store:${storeId}`, 'googleAccessToken', 'googleRefreshToken');
-			logger.info(`Revoked store '${storeId}' access to Google APIs`);
+			await this.redisClient.hmset(`store:${storeId}`, {
+				googleAnalyticsAccessToken: tokens.access_token,
+				googleAnalyticsRefreshToken: tokens.refresh_token,
+				googleAnalyticsExpiryDate: tokens.expiry_date
+			});
+			logger.info(`Granted store '${storeId}' access to Google Analytics API`);
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
+
+	async revokeGoogleAdsAccessFromStore(storeId) {
+		try {
+			await this.redisClient.hdel(`store:${storeId}`, 'googleAdsAccessToken', 'googleAdsRefreshToken');
+			logger.info(`Revoked store '${storeId}' access to Google Ads APIs`);
 		} catch (error) {
 			logger.error(error);
 			throw error;
@@ -39,11 +58,11 @@ class GoogleController {
 
 	async fetchGoogleAdsAccountList(storeId) {
 		try {
-			const token = await this.redisClient.hget(`store:${storeId}`, 'googleRefreshToken');
-			const { resource_names } = await this.googleClient.listAccessibleCustomers(token);
+			const token = await this.redisClient.hget(`store:${storeId}`, 'googleAdsRefreshToken');
+			const { resource_names } = await this.googleAds.listAccessibleCustomers(token);
 			let accounts = await Promise.all(resource_names.map(async resourceName => {
 				const customerId = resourceName.split('customers/')[1];
-				const customer = this.googleClient.Customer({
+				const customer = this.googleAds.Customer({
 					customer_id: customerId,
 					refresh_token: token
 				});
@@ -59,6 +78,7 @@ class GoogleController {
 					const { customer_client } = response.find(account => account.customer_client.id.toString() === customerId);
 					return customer_client;
 				} catch (error) {
+					logger.error(error.message);
 					return;
 				}
 			}));
@@ -81,6 +101,28 @@ class GoogleController {
 			return accounts;
 		} catch (error) {
 			logger.error(error);
+			throw error;
+		}
+	};
+
+	async fetchGoogleAnalyticsAccountList(storeId) {
+		try {
+			const tokens = await this.redisClient.hmget(`store:${storeId}`, 'googleAnalyticsAccessToken', 'googleAnalyticsRefreshToken');
+			const authClient = new google.auth.OAuth2(`${process.env.GOOGLE_CLIENT_ID}`, `${process.env.GOOGLE_CLIENT_SECRET}`);
+			authClient.setCredentials({ access_token: tokens[0], refresh_token: tokens[1] });
+
+			const analytics = google.analyticsadmin('v1alpha');
+			let accounts = [];
+			let nextPage = "";
+			do {
+				const accountSummaries = await analytics.accountSummaries.list({ auth: authClient, pageSize: 200, pageToken: nextPage });
+				accounts.push(accountSummaries.data.accountSummaries);
+				nextPage = accountSummaries.data.nextPageToken;
+			} while (nextPage);
+
+			return accounts;
+		} catch (error) {
+			console.error(error);
 			throw error;
 		}
 	};

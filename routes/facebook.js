@@ -1,11 +1,12 @@
 const router = require('express').Router();
 const logger = require('../utils/logger');
 const axios = require('axios');
-const { redisClient } = require('../om/redisClient');
+const { redis } = require('../clients');
 const FacebookController = require('../controllers/facebook');
 const { auth } = require('../middleware/auth');
 const { storeExists } = require('../middleware/store');
 
+const { redisClient } = redis;
 const facebookController = new FacebookController(redisClient);
 
 //Login facebook, quando usuário finalizar login chama a rota callback
@@ -111,7 +112,11 @@ router.post("/facebook/ads", auth, storeExists, async (req, res) => {
 
   try {
     const ads = await facebookController.fetchFacebookAds(store, start, end);
-    return res.status(200).json(ads);
+    return res.status(200).send({
+      ...ads, metricsBreakdown: ads.metricsBreakdown.sort((a, b) => {
+        return new Date(a.date) - new Date(b.date);
+      })
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Internal server error' });
   };

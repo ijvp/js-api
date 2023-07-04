@@ -1,4 +1,3 @@
-// const { shopifyApi, LATEST_API_VERSION } = require('@shopify/shopify-api');
 const { restResources } = require('@shopify/shopify-api/rest/admin/2023-04');
 const { shopifyApp } = require('@shopify/shopify-app-express');
 const { RedisSessionStorage } = require('@shopify/shopify-app-session-storage-redis');
