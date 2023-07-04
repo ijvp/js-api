@@ -1,0 +1,15 @@
+version: '3'
+services:
+  redis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '6379:6379'
+    networks:
+      - dashboard-network
+
+networks:
+  dashboard-network:
+    external:
+      name: dashboard-network
