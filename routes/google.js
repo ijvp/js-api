@@ -6,6 +6,8 @@ const { google } = require('googleapis');
 const { redis } = require('../clients');
 const GoogleController = require('../controllers/google');
 const axios = require('axios');
+const { differenceInDays, endOfToday, startOfToday}  = require('date-fns');
+const { getTimePeriodString } = require('../utils/google')
 
 const { redisClient } = redis;
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URL, TOKEN_GOOGLE } = process.env;
@@ -107,13 +109,22 @@ router.post("/google/ads", auth, storeExists, async (req, res) => {
     return res.status(400).send('Start date and end date must be set');
   };
 
+  const difference = differenceInDays(new Date(), new Date(start))
+  const isEndToday = differenceInDays(new Date(end), endOfToday()) === 0
+  const isYESTERDAY = differenceInDays(new Date(end), startOfToday()) === 0
+  const isTodayOrYESTERDAY = isEndToday || isYESTERDAY
+
+  let dateRange = getTimePeriodString({difference, isTodayOrYESTERDAY})
+
   try {
     const response = await axios.post(`${process.env.PYEND_URL}/google/ads`, {
       store: store,
       start,
-      end
+      end,
+      dateRange
     })
 
+    console.log('endDate', response.data)
 
     // tem que reordenar aqui por algum motivo, mesmo o python devolvendo em ordem...
     return res.status(200).send({
