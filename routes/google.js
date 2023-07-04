@@ -39,7 +39,7 @@ router.get('/google/authorize', auth, async (req, res) => {
     access_type: 'offline',
     prompt: 'consent',
     scope: [
-      GOOGLE_SCOPES.service
+      GOOGLE_SCOPES[service]
     ],
     state: store,
     include_granted_scopes: true,
