@@ -110,6 +110,7 @@ router.post("/google/ads", auth, storeExists, async (req, res) => {
   };
 
   const difference = differenceInDays(new Date(), new Date(start))
+  
   const isEndToday = differenceInDays(new Date(end), endOfToday()) === 0
   const isYESTERDAY = differenceInDays(new Date(end), startOfToday()) === 0
   const isTodayOrYESTERDAY = isEndToday || isYESTERDAY
