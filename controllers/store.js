@@ -30,11 +30,11 @@ class StoreController {
 			]);
 
 			if (facebookAccountExists) {
-				connections.facebook_ads = true;
+				connections.facebook_ads = await this.redisClient.hgetall(`facebook_ads_account:${storeId}`);
 			}
 
 			if (googleAccountExists) {
-				connections.google_ads = true;
+				connections.google_ads = await this.redisClient.hgetall(`google_ads_account:${storeId}`);
 			}
 
 			return connections;
