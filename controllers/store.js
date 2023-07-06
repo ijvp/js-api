@@ -1,6 +1,8 @@
 const logger = require('../utils/logger');
 const { getStoreApiURL, extractHttpsUrl } = require('../utils/shop');
 const axios = require('axios');
+const GoogleController = require('./google');
+const FacebookController = require('./facebook');
 
 class StoreController {
 	constructor(redisClient) {
@@ -30,11 +32,11 @@ class StoreController {
 			]);
 
 			if (facebookAccountExists) {
-				connections.facebook_ads = await this.redisClient.hgetall(`facebook_ads_account:${storeId}`);
+				connections.facebook_ads = await new FacebookController().getFacebookAccountByStoreId(storeId);
 			}
 
 			if (googleAccountExists) {
-				connections.google_ads = await this.redisClient.hgetall(`google_ads_account:${storeId}`);
+				connections.google_ads = await new GoogleController().getGoogleAdsAccountByStoreId(storeId);
 			}
 
 			return connections;
