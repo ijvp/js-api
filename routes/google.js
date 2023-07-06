@@ -168,4 +168,15 @@ router.get('/google-analytics/accounts', auth, storeExists, async (req, res) => 
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+router.get('/google-analytics/product-sessions', async (req, res) => {
+  try {
+    const { store } = req.query;
+    const productSessions = await googleController.fetchProductPageSessions(store);
+    res.status(200).json(productSessions);
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 module.exports = router;

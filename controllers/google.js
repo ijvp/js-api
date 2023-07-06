@@ -133,9 +133,21 @@ class GoogleController {
 			);
 			return googleAdsAccount;
 		} catch (error) {
-			logger.error('Error retrieving Google Ads Account: %s', error);
+			logger.error('Error retrieving Google Ads account: %s', error);
 			throw error;
 		};
+	};
+
+	async getGoogleAnalyticsAccountByStoreId(storeId) {
+		try {
+			const googleAnalyticsAccount = await this.redisClient.hgetall(
+				`google_analytics_account:${storeId}`
+			);
+			return googleAnalyticsAccount;
+		} catch (error) {
+			logger.error('Error retrieving Google Analytics account: %s', error);
+			throw error;
+		}
 	};
 
 	async createGoogleAdsAccount(account) {
@@ -152,7 +164,28 @@ class GoogleController {
 		try {
 			await this.redisClient.del(`google_ads_account:${storeId}`);
 			logger.info(`Google Ads account hash '${storeId}' deleted`);
-			await this.revokeGoogleAccessFromStore(storeId);
+			await this.revokeGoogleAdsAccessFromStore(storeId);
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
+
+	async fetchProductPageSessions(storeId) {
+		try {
+			// 1.)	get analytics tokens
+			// 2.)	get google_analytics_account hash -> ga4 propertyId
+			// 3.)	call analytics library runReport function with propertyId
+			//			and pass authClient
+			// 4.)	transform googleResponse into turboDashResponse
+			const tokens = await this.redisClient.hmget(`store:${storeId}`, 'googleAnalyticsAccessToken', 'googleAnalyticsRefreshToken');
+			const authClient = new google.auth.OAuth2(`${process.env.GOOGLE_CLIENT_ID}`, `${process.env.GOOGLE_CLIENT_SECRET}`);
+			authClient.setCredentials({ access_token: tokens[0], refresh_token: tokens[1] });
+
+			const analytics = google.analyticsadmin('v1beta');
+			const { propertyId } = await this.getGoogleAnalyticsAccountByStoreId(storeId);
+
+			// const report = await analytics.properties;
 		} catch (error) {
 			logger.error(error);
 			throw error;
