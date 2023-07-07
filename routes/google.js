@@ -6,6 +6,7 @@ const { google } = require('googleapis');
 const { redis } = require('../clients');
 const GoogleController = require('../controllers/google');
 const axios = require('axios');
+const { differenceInDays, parseISO } = require('date-fns');
 
 const { redisClient } = redis;
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URL, TOKEN_GOOGLE } = process.env;
@@ -205,6 +206,36 @@ router.get('/google-analytics/product-sessions', auth, storeExists, async (req, 
     res.status(200).json(productSessions);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+router.get('/date-range', (req, res) => {
+  const { start, end } = req.query;
+
+  // Convert start and end strings to Date objects
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  startDate.setUTCHours(0, 0, 0, 0);
+  endDate.setUTCHours(23, 59, 59, 999);
+
+  // Get the current date
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+
+  // Get yesterday's date by subtracting 1 day from the current date
+  const yesterday = new Date(today);
+  yesterday.setUTCDate(today.getUTCDate() - 1);
+  yesterday.setUTCHours(0, 0, 0, 0);
+
+  const thirtyDaysAgo = new Date(endDate);
+  thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30)
+  res.json({ diff: differenceInDays(endDate, startDate), var: thirtyDaysAgo, start: startDate, end: endDate, now: now });
+
+  // Check if the date range represents today or yesterday
+  if (startDate <= today && endDate >= today) {
+    res.send('Date range represents today');
+  } else if (startDate <= yesterday && endDate >= yesterday) {
+    res.send('Date range represents yesterday');
   }
 });
 

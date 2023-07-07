@@ -223,7 +223,38 @@ class GoogleController {
 
 			const analytics = google.analyticsdata('v1beta')
 			const { id } = await this.getGoogleAnalyticsPropertyByStoreId(storeId);
-			const report = await analytics.properties.runReport({ property: `properties/${id}`, auth: authClient });
+			// query built using https://ga-dev-tools.google/ga4/query-explorer/
+			const { data: report } = await analytics.properties.runReport({
+				auth: authClient,
+				property: `properties/${id}`,
+				requestBody: {
+					dimensions: [
+						{
+							name: 'pagePath'
+						}
+					],
+					dimensionFilter: {
+						filter: {
+							fieldName: 'pagePath',
+							stringFilter: {
+								matchType: "CONTAINS",
+								value: "products"
+							}
+						}
+					},
+					metrics: [
+						{
+							name: "sessions"
+						}
+					],
+					dateRanges: [
+						{
+							startDate: '7daysAgo',
+							endDate: 'yesterday'
+						},
+					],
+				}
+			});
 			return report;
 		} catch (error) {
 			logger.error(error);
