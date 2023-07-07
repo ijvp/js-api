@@ -221,10 +221,10 @@ class GoogleController {
 			const authClient = new google.auth.OAuth2(`${process.env.GOOGLE_CLIENT_ID}`, `${process.env.GOOGLE_CLIENT_SECRET}`);
 			authClient.setCredentials({ access_token: tokens[0], refresh_token: tokens[1] });
 
-			const analytics = google.analyticsadmin('v1beta');
-			const { propertyId } = await this.getGoogleAnalyticsAccountByStoreId(storeId);
-
-			// const report = await analytics.properties;
+			const analytics = google.analyticsdata('v1beta')
+			const { id } = await this.getGoogleAnalyticsPropertyByStoreId(storeId);
+			const report = await analytics.properties.runReport({ property: `properties/${id}`, auth: authClient });
+			return report;
 		} catch (error) {
 			logger.error(error);
 			throw error;
