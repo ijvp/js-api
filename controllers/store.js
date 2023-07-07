@@ -24,19 +24,25 @@ class StoreController {
 			const connections = {
 				facebook_ads: false,
 				google_ads: false,
+				google_analytics: false
 			};
 
-			const [facebookAccountExists, googleAccountExists] = await Promise.all([
+			const [facebookAccountExists, googleAdsAccountExists, googleAnalyticsPropertyExists] = await Promise.all([
 				this.redisClient.exists(`facebook_ads_account:${storeId}`),
 				this.redisClient.exists(`google_ads_account:${storeId}`),
+				this.redisClient.exists(`google_analytics_property:${storeId}`)
 			]);
 
 			if (facebookAccountExists) {
-				connections.facebook_ads = await new FacebookController().getFacebookAccountByStoreId(storeId);
+				connections.facebook_ads = await new FacebookController(this.redisClient).getFacebookAccountByStoreId(storeId);
 			}
 
-			if (googleAccountExists) {
-				connections.google_ads = await new GoogleController().getGoogleAdsAccountByStoreId(storeId);
+			if (googleAdsAccountExists) {
+				connections.google_ads = await new GoogleController(this.redisClient).getGoogleAdsAccountByStoreId(storeId);
+			}
+
+			if (googleAnalyticsPropertyExists) {
+				connections.google_analytics = await new GoogleController(this.redisClient).getGoogleAnalyticsPropertyByStoreId(storeId);
 			}
 
 			return connections;

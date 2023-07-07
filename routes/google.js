@@ -79,7 +79,7 @@ router.post("/google-ads/account/connect", auth, storeExists, async (req, res) =
   }
 
   try {
-    await googleController.createGoogleAdsAccount({ ...account, storeId: store });
+    await googleController.storeGoogleAdsAccount({ ...account, storeId: store });
     return res.status(201).json({
       success: true, message: `Google Ads account ${account.name} added to ${store}`
     });
@@ -166,7 +166,7 @@ router.post("/google-analytics/account/connect", auth, storeExists, async (req, 
   }
 
   try {
-    await googleController.createGoogleAnalyticsProperty({ ...account, storeId: store });
+    await googleController.storeGoogleAnalyticsProperty({ ...account, storeId: store });
     return res.status(201).json({
       success: true, message: `Google Ads account ${account.name} added to ${store}`
     });

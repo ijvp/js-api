@@ -180,7 +180,7 @@ class GoogleController {
 	async getGoogleAnalyticsPropertyByStoreId(storeId) {
 		try {
 			const googleAnalyticsAccount = await this.redisClient.hgetall(
-				`google_analytics_account:${storeId}`
+				`google_analytics_property:${storeId}`
 			);
 			return googleAnalyticsAccount;
 		} catch (error) {
@@ -191,7 +191,7 @@ class GoogleController {
 
 	async storeGoogleAnalyticsProperty(account) {
 		try {
-			await this.redisClient.hset(`google_analytics_account:${account.storeId}`, account);
+			await this.redisClient.hset(`google_analytics_property:${account.storeId}`, account);
 			logger.info(`Google Analytics account hash '${account.storeId}' persisted`);
 		} catch (error) {
 			logger.error(error);
