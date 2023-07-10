@@ -125,7 +125,6 @@ class GoogleController {
 
 	// Google Analytics
 	async grantGoogleAnalyticsAccessToStore(storeId, tokens) {
-		console.log("GOOGLE ANALYTICS TOKENS", tokens);
 		try {
 			await this.redisClient.hmset(`store:${storeId}`, {
 				googleAnalyticsAccessToken: tokens.access_token,
@@ -210,7 +209,7 @@ class GoogleController {
 		}
 	};
 
-	async fetchProductPageSessions(storeId) {
+	async fetchProductPageSessions(storeId, dateRange) {
 		try {
 			// 1.)	get analytics tokens
 			// 2.)	get google_analytics_account hash -> ga4 propertyId
@@ -224,6 +223,7 @@ class GoogleController {
 			const analytics = google.analyticsdata('v1beta')
 			const { id } = await this.getGoogleAnalyticsPropertyByStoreId(storeId);
 			// query built using https://ga-dev-tools.google/ga4/query-explorer/
+
 			const { data: report } = await analytics.properties.runReport({
 				auth: authClient,
 				property: `properties/${id}`,
@@ -248,10 +248,7 @@ class GoogleController {
 						}
 					],
 					dateRanges: [
-						{
-							startDate: '7daysAgo',
-							endDate: 'yesterday'
-						},
+						dateRange,
 					],
 				}
 			});
