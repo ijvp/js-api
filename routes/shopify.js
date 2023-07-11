@@ -97,6 +97,20 @@ router.post('/shopify/most-wanted', auth, async (req, res) => {
 	};
 });
 
+router.post('/shopify/products', auth, storeExists, async (req, res) => {
+	const { store } = req.body;
+	if (!store) {
+		return res.status(400).json({ success: false, message: 'Invalid request body, missing store' })
+	};
+
+	try {
+		const products = await storeController.fetchStoreProducts(store);
+		return res.json(products);
+	} catch (error) {
+		return res.status(500).json({ success: false, message: JSON.stringify(error) });
+	}
+});
+
 router.post('/shopify/product', auth, async (req, res) => {
 	const { store, productId } = req.body;
 	if (!productId) {
@@ -117,8 +131,4 @@ router.post('/shopify/product', auth, async (req, res) => {
 	}
 });
 
-router.get('/shopify/test', (req, res) => {
-	logger.info(req.session);
-	res.json(req.session);
-})
 module.exports = router;

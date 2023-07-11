@@ -87,16 +87,16 @@ class StoreController {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
 			const allOrders = [];
 			let ordersEndpoint = `${getStoreApiURL(storeId)}/orders.json`;
-
+			let params = {
+				created_at_min: new Date(start),
+				created_at_max: new Date(end),
+				financial_status: 'paid',
+				status: 'any',
+				limit: 250
+			}
 			while (ordersEndpoint) {
 				const response = await axios.get(ordersEndpoint, {
-					params: {
-						created_at_min: new Date(start),
-						created_at_max: new Date(end),
-						financial_status: 'paid',
-						status: 'any',
-						limit: 250
-					},
+					params,
 					headers: {
 						'X-Shopify-Access-Token': accessToken
 					}
@@ -105,6 +105,7 @@ class StoreController {
 				const trueOrders = response.data.orders.filter(order => order.cancelled_at === null);
 				allOrders.push(...trueOrders);
 				ordersEndpoint = extractHttpsUrl(response.headers.link);
+				params = undefined;
 			};
 
 			return allOrders;
@@ -147,32 +148,47 @@ class StoreController {
 		}
 	};
 
-	async fetchBestSellingProducts(storeId) {
+	async fetchStoreProducts(storeId) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const allProducts = [];
 
-			let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
-			const query = `{
-				products(first: 10, sortKey: BEST_SELLING) {
-					edges {
-						node {
-							id
-							title
-						}
+			let productsEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+			let query = `query ( $numProducts: Int!, $cursor: String){
+				products(first: $numProducts, after: $cursor) {
+					nodes {
+						id
+						title
+						handle
+					}
+					pageInfo {
+						hasNextPage
+						endCursor
 					}
 				}
 			}`;
+			const numProducts = 250;
+			let cursor = null;
+			let variables = { numProducts, cursor }
+			do {
+				const response = await axios.post(productsEndpoint,
+					{
+						query,
+						variables
+					},
+					{
+						headers: {
+							'Content-Type': 'application/json',
+							'X-Shopify-Access-Token': accessToken
+						}
+					});
 
-			const response = await axios.post(graphqlEndpoint,
-				{ query },
-				{
-					headers: {
-						'Content-Type': 'application/json',
-						'X-Shopify-Storefront-Access-Token': accessToken
-					}
-				});
+				allProducts.push(...response.data.data.products.nodes)
+				const { hasNextPage, endCursor } = response.data.data.products.pageInfo;
+				variables.cursor = hasNextPage ? endCursor : null;
+			} while (variables.cursor);
 
-			return response.data.data.products.edges;
+			return allProducts;
 		} catch (error) {
 			logger.error('Failed to fetch abandoned checkouts %s', error);
 			throw error;
