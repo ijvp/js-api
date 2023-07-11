@@ -62,6 +62,7 @@ router.post('/shopify/orders', auth, storeExists, async (req, res) => {
 	try {
 		//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
 		const orders = await storeController.fetchStoreOrders({ storeId: store, start, end });
+		console.log(orders[0].line_items);
 		return res.json(getMetrics(orders, granularity));
 	} catch (error) {
 		return res.status(500).json({ success: false, error: 'Internal Server Error' });
@@ -107,6 +108,7 @@ router.post('/shopify/products', auth, storeExists, async (req, res) => {
 		const products = await storeController.fetchStoreProducts(store);
 		return res.json(products);
 	} catch (error) {
+		console.log(error)
 		return res.status(500).json({ success: false, message: JSON.stringify(error) });
 	}
 });
@@ -131,4 +133,41 @@ router.post('/shopify/product', auth, async (req, res) => {
 	}
 });
 
+router.post('/shopify/products-bulk-read', async (req, res) => {
+	try {
+		console.log(req.body, req.headers);
+		const {
+			admin_graphql_api_id,
+			completed_at,
+			created_at,
+			error_code,
+			status,
+			type
+		} = req.body;
+		let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+
+		const bulkOperationUrlQuery = `
+			query {
+				node(id: ${admin_graphlq_api_id}) {
+					... on BulkOperation {
+						url
+						partialDataUrl
+					}
+				}
+			}
+		`;;
+
+		const bulkOperationUrlResponse = await axios.post(graphqlEndpoint,
+			{
+				bulkOperationUrlQuery
+			});
+
+		console.log(bulkOperationUrlResponse.data);
+	} catch (error) {
+		logger.error(error);
+	}
+})
 module.exports = router;
+
+
+

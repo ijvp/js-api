@@ -148,49 +148,89 @@ class StoreController {
 		}
 	};
 
+	// very expensive query! https://shopify.dev/docs/api/usage/bulk-operations/queries
 	async fetchStoreProducts(storeId) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
 			const allProducts = [];
 
-			let productsEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
-			let query = `query ( $numProducts: Int!, $cursor: String){
-				products(first: $numProducts, after: $cursor) {
-					nodes {
-						id
-						title
-						handle
+			let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+
+			let bulkOperationQuery = `
+			mutation {
+				bulkOperationRunQuery(
+				 query: """
+					{
+						products {
+							edges {
+								node {
+									id
+									title
+								}
+							}
+						}
 					}
-					pageInfo {
-						hasNextPage
-						endCursor
+					"""
+				) {
+					bulkOperation {
+						id
+						status
+					}
+					userErrors {
+						field
+						message
 					}
 				}
-			}`;
-			const numProducts = 250;
-			let cursor = null;
-			let variables = { numProducts, cursor }
-			do {
-				const response = await axios.post(productsEndpoint,
-					{
-						query,
-						variables
-					},
-					{
-						headers: {
-							'Content-Type': 'application/json',
-							'X-Shopify-Access-Token': accessToken
+			}
+			`;
+
+			let webhookSubscriptionQuery = `
+				mutation {
+					webhookSubscriptionCreate(
+						topic: BULK_OPERATIONS_FINISH
+						webhookSubscription: {
+							format: JSON,
+							callbackUrl: "${process.env.URL}/shopify/products-bulk-read"
 						}
-					});
+					) {
+						userErrors {
+							field
+							message
+						}
+						webhookSubscription {
+							id
+						}
+					}
+				}
+			`;
+			const bulkOperationResponse = await axios.post(graphqlEndpoint,
+				{
+					query: bulkOperationQuery
+				},
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Access-Token': accessToken
+					}
+				});
 
-				allProducts.push(...response.data.data.products.nodes)
-				const { hasNextPage, endCursor } = response.data.data.products.pageInfo;
-				variables.cursor = hasNextPage ? endCursor : null;
-			} while (variables.cursor);
+			const webhookSubscriptionResponse = await axios.post(graphqlEndpoint,
+				{
+					query: webhookSubscriptionQuery
+				},
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Access-Token': accessToken
+					}
+				}
+			);
 
+			console.log(webhookSubscriptionResponse.data);
 			return allProducts;
 		} catch (error) {
-			logger.error('Failed to fetch abandoned checkouts %s', error);
+			console.log(error);
+			logger.error('Failed to fetch products\n%s', error);
 			throw error;
 		};
 	};
