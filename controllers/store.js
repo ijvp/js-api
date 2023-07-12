@@ -3,6 +3,8 @@ const { getStoreApiURL, extractHttpsUrl } = require('../utils/shop');
 const axios = require('axios');
 const GoogleController = require('./google');
 const FacebookController = require('./facebook');
+const readline = require('readline');
+const fs = require('fs');
 
 class StoreController {
 	constructor(redisClient) {
@@ -148,11 +150,11 @@ class StoreController {
 		}
 	};
 
+	// TODO: refactor
 	// very expensive query! https://shopify.dev/docs/api/usage/bulk-operations/queries
-	async fetchStoreProducts(storeId) {
+	async submitBulkProductsQuery(storeId) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
-			const allProducts = [];
 
 			let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
 
@@ -165,7 +167,14 @@ class StoreController {
 							edges {
 								node {
 									id
+									handle
 									title
+									featuredImage {
+										altText
+										height
+										url
+										width
+									}
 								}
 							}
 						}
@@ -190,7 +199,7 @@ class StoreController {
 						topic: BULK_OPERATIONS_FINISH
 						webhookSubscription: {
 							format: JSON,
-							callbackUrl: "${process.env.URL}/shopify/products-bulk-read"
+							callbackUrl: "https://e03f-2804-d45-9682-e500-b583-f8aa-2207-e229.ngrok-free.app/shopify/products-bulk-read"
 						}
 					) {
 						userErrors {
@@ -203,6 +212,7 @@ class StoreController {
 					}
 				}
 			`;
+
 			const bulkOperationResponse = await axios.post(graphqlEndpoint,
 				{
 					query: bulkOperationQuery
@@ -226,10 +236,54 @@ class StoreController {
 				}
 			);
 
-			console.log(webhookSubscriptionResponse.data);
-			return allProducts;
+			return;
 		} catch (error) {
-			console.log(error);
+			logger.error('Failed to submit bulk products query\n%s', error);
+			throw error;
+		};
+	};
+
+	async fetchBulkProductsQueryJSONL(storeId, graphqlApiId) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+			const products = [];
+			const bulkOperationUrlQuery = `
+				query {
+					node(id: "${graphqlApiId}") {
+						... on BulkOperation {
+							url
+							partialDataUrl
+						}
+					}
+				}
+			`;
+
+			const bulkOperationUrlResponse = await axios.post(graphqlEndpoint,
+				{
+					query: bulkOperationUrlQuery
+				}, {
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Shopify-Access-Token': accessToken
+				}
+			});
+
+			const { url } = bulkOperationUrlResponse.data.data.node;
+			const productsJSONLResponse = await axios.get(url, {
+				responseType: 'stream'
+			});
+
+			const readInterface = readline.createInterface({
+				input: productsJSONLResponse.data
+			});
+
+			for await (const line of readInterface) {
+				products.push(JSON.parse(line));
+			}
+
+			return products;
+		} catch (error) {
 			logger.error('Failed to fetch products\n%s', error);
 			throw error;
 		};

@@ -5,7 +5,8 @@ const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
-
+const http = require('http');
+const socket = require('./sockets');
 //modules
 const { redisStore } = require('./clients');
 
@@ -23,6 +24,8 @@ const logger = require('./utils/logger');
 
 const port = process.env.PORT || 8080;
 const app = express();
+const server = http.createServer(app);
+socket.initialize(server);
 
 // Tell express to allow nginx address directly next to app
 // which points to the aws production load balancer
@@ -89,10 +92,8 @@ app.use('/', facebookRoutes);
 app.use('/', userRoutes);
 app.use('/', gdprRoutes);
 
-app.listen(port, () => {
+server.listen(port, () => {
 	logger.info('NODE ENV: %s', process.env.NODE_ENV);
 	logger.info('Server running on port %d', port);
 	connect();
 });
-
-

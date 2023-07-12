@@ -5,7 +5,10 @@ const { auth } = require('../middleware/auth');
 const { storeExists } = require('../middleware/store');
 const { shopify, redis } = require('../clients');
 const { encrypt } = require('../utils/crypto');
+const { getStoreApiURL } = require('../utils/shop');
 const StoreController = require('../controllers/store');
+const axios = require('axios');
+const socket = require('../sockets');
 
 const storeController = new StoreController(redis.redisClient);
 
@@ -105,7 +108,7 @@ router.post('/shopify/products', auth, storeExists, async (req, res) => {
 	};
 
 	try {
-		const products = await storeController.fetchStoreProducts(store);
+		const products = await storeController.submitBulkProductsQuery(store);
 		return res.json(products);
 	} catch (error) {
 		console.log(error)
@@ -135,7 +138,6 @@ router.post('/shopify/product', auth, async (req, res) => {
 
 router.post('/shopify/products-bulk-read', async (req, res) => {
 	try {
-		console.log(req.body, req.headers);
 		const {
 			admin_graphql_api_id,
 			completed_at,
@@ -144,25 +146,12 @@ router.post('/shopify/products-bulk-read', async (req, res) => {
 			status,
 			type
 		} = req.body;
-		let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+		const storeId = req.headers['x-shopify-shop-domain'];
 
-		const bulkOperationUrlQuery = `
-			query {
-				node(id: ${admin_graphlq_api_id}) {
-					... on BulkOperation {
-						url
-						partialDataUrl
-					}
-				}
-			}
-		`;;
+		const products = await storeController.fetchBulkProductsQueryJSONL(storeId, admin_graphql_api_id);
 
-		const bulkOperationUrlResponse = await axios.post(graphqlEndpoint,
-			{
-				bulkOperationUrlQuery
-			});
-
-		console.log(bulkOperationUrlResponse.data);
+		socket.getIO().emit('products', products);
+		res.sendStatus(200);
 	} catch (error) {
 		logger.error(error);
 	}
