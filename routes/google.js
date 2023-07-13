@@ -121,7 +121,7 @@ router.post("/google-ads/ads", auth, storeExists, async (req, res) => {
   };
 
   try {
-    const response = await axios.post(`${process.env.PYEND_URL} / google / ads`, {
+    const response = await axios.post(`${process.env.PYEND_URL}/google-ads/ads`, {
       store: store,
       start,
       end
