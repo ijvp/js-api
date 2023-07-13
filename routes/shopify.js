@@ -155,8 +155,6 @@ router.post('/shopify/products-bulk-read', async (req, res) => {
 	} catch (error) {
 		logger.error(error);
 	}
-})
+});
+
 module.exports = router;
-
-
-
