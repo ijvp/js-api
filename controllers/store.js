@@ -84,14 +84,15 @@ class StoreController {
 		}
 	};
 
-	async fetchStoreOrders({ storeId, start, end }) {
+	async fetchStoreOrders(storeId, start, end) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
 			const allOrders = [];
 			let ordersEndpoint = `${getStoreApiURL(storeId)}/orders.json`;
 			let params = {
-				created_at_min: new Date(start),
-				created_at_max: new Date(end),
+				//TODO: remover essa gambiarra?
+				created_at_min: start + 'T00:00:00:000',
+				created_at_max: end + 'T23:59:59:999',
 				financial_status: 'paid',
 				status: 'any',
 				limit: 250
@@ -169,6 +170,16 @@ class StoreController {
 									id
 									handle
 									title
+									priceRangeV2 {
+										maxVariantPrice {
+											amount
+											currencyCode
+										}
+										minVariantPrice {
+											amount
+											currencyCode
+										}
+									}
 									featuredImage {
 										altText
 										height
@@ -199,7 +210,7 @@ class StoreController {
 						topic: BULK_OPERATIONS_FINISH
 						webhookSubscription: {
 							format: JSON,
-							callbackUrl: "https://e03f-2804-d45-9682-e500-b583-f8aa-2207-e229.ngrok-free.app/shopify/products-bulk-read"
+							callbackUrl: "https://7b43-2804-d45-9682-e500-8955-f92d-f2cc-3af6.ngrok-free.app/shopify/products-bulk-read"
 						}
 					) {
 						userErrors {
@@ -235,8 +246,6 @@ class StoreController {
 					}
 				}
 			);
-
-			return;
 		} catch (error) {
 			logger.error('Failed to submit bulk products query\n%s', error);
 			throw error;
@@ -279,7 +288,7 @@ class StoreController {
 			});
 
 			for await (const line of readInterface) {
-				products.push(JSON.parse(line));
+				products.push(line);
 			}
 
 			return products;
@@ -289,6 +298,90 @@ class StoreController {
 		};
 	};
 
+	async saveStoreProducts(storeId, products) {
+		try {
+			await this.redisClient.sadd(`products:${storeId}`, products);
+			logger.info(`%i products associated with store '${storeId}'`, products.length);
+		} catch (error) {
+			logger.error(`Failed to save products for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async readStoreProducts(storeId) {
+		try {
+			const products = [];
+			const productMembers = await this.redisClient.smembers(`products:${storeId}`);
+			productMembers.forEach(member => products.push(JSON.parse(member)));
+			return products;
+		} catch (error) {
+			logger.error(`Failed to read products for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async fetchStoreProductOrders(storeId, start, end) {
+		try {
+			const products = await this.readStoreProducts(storeId);
+			const orders = await this.fetchStoreOrders(storeId, start, end);
+			const productSalesMap = new Map();
+			orders.forEach(order => {
+				order.line_items.forEach(product => {
+					const { product_id, title, price, handle } = product;
+					if (productSalesMap.has(product_id)) {
+						const currentData = productSalesMap.get(product_id);
+						productSalesMap.set(product_id, {
+							name: title,
+							handle,
+							salesValue: currentData.salesValue + Number(price),
+							totalOrders: currentData.totalOrders + 1
+						});
+					} else {
+						productSalesMap.set(product_id, {
+							name: title,
+							salesValue: Number(price),
+							totalOrders: 1
+						});
+					}
+				});
+			});
+
+			const productOrders = products.map(product => {
+				const { id, title, handle } = product;
+				const productData = productSalesMap.get(Number(id));
+				return {
+					id,
+					title,
+					handle,
+					salesValue: productData ? productData.salesValue : 0,
+					totalOrders: productData ? productData.totalOrders : 0,
+				}
+			});
+
+			return productOrders;
+		} catch (error) {
+			logger.error(`Failed to fetch product orders for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async fetchStoreProductOrdersByProductId(storeId, productId, start, end) {
+		const products = await this.readStoreProducts(storeId);
+		const product = products.find(product => product.id === productId);
+		return product;
+	};
+
+	async fetchStoreProduct(storeId, productId) {
+		try {
+			const products = await this.readStoreProducts(storeId);
+			const product = products.find(product => product.id === productId);
+			return product;
+		} catch (error) {
+			logger.error(`Failed to read product '${productId}' for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
 	async deleteStoreData(storeId, userId) {
 		try {
 			await this.redisClient.del(`facebook_ads_account:${storeId}`);
@@ -296,7 +389,7 @@ class StoreController {
 			await this.redisClient.del(`store:${storeId}`);
 			userId && await this.redisClient.srem(`user_stores:${userId}`, storeId);
 		} catch (error) {
-			logger.error(`Failed to delete data for store '${store}': %s`, error);
+			logger.error(`Failed to delete data for store '${storeId}': %s`, error);
 			throw error;
 		}
 	}
