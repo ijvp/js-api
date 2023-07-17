@@ -69,8 +69,7 @@ class GoogleController {
 				}
 			}));
 
-			accounts = accounts.filter(account => !!account);
-			accounts = accounts.filter(account => account.descriptive_name);
+			accounts = accounts.filter(account => !!account && account.descriptive_name);
 			accounts.sort((a, b) => {
 				const nameA = a.descriptive_name.toUpperCase();
 				const nameB = b.descriptive_name.toUpperCase();
@@ -83,7 +82,7 @@ class GoogleController {
 					return 0;
 				}
 			});
-
+			accounts.map(account => { return { id: account.id, name: account.descriptive_name } });
 			return accounts;
 		} catch (error) {
 			logger.error(error);
