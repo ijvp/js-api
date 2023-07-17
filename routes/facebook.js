@@ -122,4 +122,45 @@ router.post("/facebook/ads", auth, storeExists, async (req, res) => {
   };
 });
 
+router.post("/facebook/campaigns", auth, storeExists, async (req, res) => {
+  const { store } = req.body;
+
+  if (!store) {
+    return res.status(400).json({ success: false, message: 'Invalid request body' });
+  }
+
+  try {
+    const campaigns = await facebookController.fetchActiveFacebookCampaigns(store);
+    return res.json(campaigns);
+  } catch (error) {
+    logger.error(error);
+    res.status(500).json({ success: false, error: "Internal server error" });
+  }
+});
+
+router.post("/facebook/ad-sets", auth, storeExists, async (req, res) => {
+  const { store } = req.body;
+
+  if (!store) {
+    return res.status(400).json({ success: false, message: 'Invalid request body' });
+  }
+
+  try {
+    const adSets = [];
+    const { data: campaigns } = await facebookController.fetchActiveFacebookCampaigns(store);
+
+    const adSetsPromises = campaigns.map(async campaign => {
+      const campaignAdSets = await facebookController.fetchFacebookCampaignAdSets(store, campaign.id);
+      return { campaignId: campaign.id, adSets: campaignAdSets.data };
+    });
+
+    adSets.push(...await Promise.all(adSetsPromises));
+
+    return res.json(adSets);
+  } catch (error) {
+    logger.error(error);
+    return res.status(500).json({ success: false, error: "Internal server error" })
+  }
+})
+
 module.exports = router;

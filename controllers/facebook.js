@@ -155,7 +155,50 @@ class FacebookController {
 			logger.error(error);
 			throw error;
 		}
-	}
+	};
+
+	async fetchActiveFacebookCampaigns(storeId) {
+		try {
+			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
+			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
+
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/campaigns`;
+
+			const response = await axios.get(url, {
+				params: {
+					access_token: facebookAccessToken,
+					fields: 'id,name',
+					effective_status: ['ACTIVE']
+				}
+			});
+
+			return response.data;
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
+
+	async fetchFacebookCampaignAdSets(storeId, campaignId) {
+		try {
+			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
+			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${campaignId}/adsets`;
+
+			const response = await axios.get(url, {
+				params: {
+					access_token: facebookAccessToken,
+					fields: 'id,name',
+					effective_status: ['ACTIVE']
+				}
+			});
+
+			return response.data;
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
 };
 
 module.exports = FacebookController;
