@@ -1,6 +1,10 @@
 const logger = require('../utils/logger');
 const { getStoreApiURL, extractHttpsUrl } = require('../utils/shop');
 const axios = require('axios');
+const GoogleController = require('./google');
+const FacebookController = require('./facebook');
+const readline = require('readline');
+const fs = require('fs');
 
 class StoreController {
 	constructor(redisClient) {
@@ -22,19 +26,25 @@ class StoreController {
 			const connections = {
 				facebook_ads: false,
 				google_ads: false,
+				google_analytics: false
 			};
 
-			const [facebookAccountExists, googleAccountExists] = await Promise.all([
+			const [facebookAccountExists, googleAdsAccountExists, googleAnalyticsPropertyExists] = await Promise.all([
 				this.redisClient.exists(`facebook_ads_account:${storeId}`),
 				this.redisClient.exists(`google_ads_account:${storeId}`),
+				this.redisClient.exists(`google_analytics_property:${storeId}`)
 			]);
 
 			if (facebookAccountExists) {
-				connections.facebook_ads = await this.redisClient.hgetall(`facebook_ads_account:${storeId}`);
+				connections.facebook_ads = await new FacebookController(this.redisClient).getFacebookAccountByStoreId(storeId);
 			}
 
-			if (googleAccountExists) {
-				connections.google_ads = await this.redisClient.hgetall(`google_ads_account:${storeId}`);
+			if (googleAdsAccountExists) {
+				connections.google_ads = await new GoogleController(this.redisClient).getGoogleAdsAccountByStoreId(storeId);
+			}
+
+			if (googleAnalyticsPropertyExists) {
+				connections.google_analytics = await new GoogleController(this.redisClient).getGoogleAnalyticsPropertyByStoreId(storeId);
 			}
 
 			return connections;
@@ -74,21 +84,22 @@ class StoreController {
 		}
 	};
 
-	async fetchStoreOrders({ storeId, start, end }) {
+	async fetchStoreOrders(storeId, start, end) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
 			const allOrders = [];
 			let ordersEndpoint = `${getStoreApiURL(storeId)}/orders.json`;
-
+			let params = {
+				//TODO: remover essa gambiarra?
+				created_at_min: start + 'T00:00:00:000',
+				created_at_max: end + 'T23:59:59:999',
+				financial_status: 'paid',
+				status: 'any',
+				limit: 250
+			}
 			while (ordersEndpoint) {
 				const response = await axios.get(ordersEndpoint, {
-					params: {
-						created_at_min: new Date(start),
-						created_at_max: new Date(end),
-						financial_status: 'paid',
-						status: 'any',
-						limit: 250
-					},
+					params,
 					headers: {
 						'X-Shopify-Access-Token': accessToken
 					}
@@ -97,6 +108,7 @@ class StoreController {
 				const trueOrders = response.data.orders.filter(order => order.cancelled_at === null);
 				allOrders.push(...trueOrders);
 				ordersEndpoint = extractHttpsUrl(response.headers.link);
+				params = undefined;
 			};
 
 			return allOrders;
@@ -139,36 +151,235 @@ class StoreController {
 		}
 	};
 
-	async fetchBestSellingProducts(storeId) {
+	// TODO: refactor
+	// very expensive query! https://shopify.dev/docs/api/usage/bulk-operations/queries
+	async submitBulkProductsQuery(storeId) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
 
 			let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
-			const query = `{
-				products(first: 10, sortKey: BEST_SELLING) {
-					edges {
-						node {
+
+			let bulkOperationQuery = `
+			mutation {
+				bulkOperationRunQuery(
+				 query: """
+					{
+						products {
+							edges {
+								node {
+									id
+									handle
+									title
+									priceRangeV2 {
+										maxVariantPrice {
+											amount
+											currencyCode
+										}
+										minVariantPrice {
+											amount
+											currencyCode
+										}
+									}
+									featuredImage {
+										altText
+										height
+										url
+										width
+									}
+								}
+							}
+						}
+					}
+					"""
+				) {
+					bulkOperation {
+						id
+						status
+					}
+					userErrors {
+						field
+						message
+					}
+				}
+			}
+			`;
+
+			let webhookSubscriptionQuery = `
+				mutation {
+					webhookSubscriptionCreate(
+						topic: BULK_OPERATIONS_FINISH
+						webhookSubscription: {
+							format: JSON,
+							callbackUrl: "https://7b43-2804-d45-9682-e500-8955-f92d-f2cc-3af6.ngrok-free.app/shopify/products-bulk-read"
+						}
+					) {
+						userErrors {
+							field
+							message
+						}
+						webhookSubscription {
 							id
-							title
 						}
 					}
 				}
-			}`;
+			`;
 
-			const response = await axios.post(graphqlEndpoint,
-				{ query },
+			const bulkOperationResponse = await axios.post(graphqlEndpoint,
+				{
+					query: bulkOperationQuery
+				},
 				{
 					headers: {
 						'Content-Type': 'application/json',
-						'X-Shopify-Storefront-Access-Token': accessToken
+						'X-Shopify-Access-Token': accessToken
 					}
 				});
 
-			return response.data.data.products.edges;
+			const webhookSubscriptionResponse = await axios.post(graphqlEndpoint,
+				{
+					query: webhookSubscriptionQuery
+				},
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Access-Token': accessToken
+					}
+				}
+			);
 		} catch (error) {
-			logger.error('Failed to fetch abandoned checkouts %s', error);
+			logger.error('Failed to submit bulk products query\n%s', error);
 			throw error;
 		};
+	};
+
+	async fetchBulkProductsQueryJSONL(storeId, graphqlApiId) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+			const products = [];
+			const bulkOperationUrlQuery = `
+				query {
+					node(id: "${graphqlApiId}") {
+						... on BulkOperation {
+							url
+							partialDataUrl
+						}
+					}
+				}
+			`;
+
+			const bulkOperationUrlResponse = await axios.post(graphqlEndpoint,
+				{
+					query: bulkOperationUrlQuery
+				}, {
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Shopify-Access-Token': accessToken
+				}
+			});
+
+			const { url } = bulkOperationUrlResponse.data.data.node;
+			const productsJSONLResponse = await axios.get(url, {
+				responseType: 'stream'
+			});
+
+			const readInterface = readline.createInterface({
+				input: productsJSONLResponse.data
+			});
+
+			for await (const line of readInterface) {
+				products.push(line);
+			}
+
+			return products;
+		} catch (error) {
+			logger.error('Failed to fetch products\n%s', error);
+			throw error;
+		};
+	};
+
+	async saveStoreProducts(storeId, products) {
+		try {
+			await this.redisClient.sadd(`products:${storeId}`, products);
+			logger.info(`%i products associated with store '${storeId}'`, products.length);
+		} catch (error) {
+			logger.error(`Failed to save products for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async readStoreProducts(storeId) {
+		try {
+			const products = [];
+			const productMembers = await this.redisClient.smembers(`products:${storeId}`);
+			productMembers.forEach(member => products.push(JSON.parse(member)));
+			return products;
+		} catch (error) {
+			logger.error(`Failed to read products for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async fetchStoreProductOrders(storeId, start, end) {
+		try {
+			const products = await this.readStoreProducts(storeId);
+			const orders = await this.fetchStoreOrders(storeId, start, end);
+			const productSalesMap = new Map();
+			orders.forEach(order => {
+				order.line_items.forEach(product => {
+					const { product_id, title, price, handle } = product;
+					if (productSalesMap.has(product_id)) {
+						const currentData = productSalesMap.get(product_id);
+						productSalesMap.set(product_id, {
+							name: title,
+							handle,
+							salesValue: currentData.salesValue + Number(price),
+							totalOrders: currentData.totalOrders + 1
+						});
+					} else {
+						productSalesMap.set(product_id, {
+							name: title,
+							salesValue: Number(price),
+							totalOrders: 1
+						});
+					}
+				});
+			});
+
+			const productOrders = products.map(product => {
+				const { id, title, handle } = product;
+				const productData = productSalesMap.get(Number(id));
+				return {
+					id,
+					title,
+					handle,
+					salesValue: productData ? productData.salesValue : 0,
+					totalOrders: productData ? productData.totalOrders : 0,
+				}
+			});
+
+			return productOrders;
+		} catch (error) {
+			logger.error(`Failed to fetch product orders for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async fetchStoreProductOrdersByProductId(storeId, productId, start, end) {
+		const products = await this.readStoreProducts(storeId);
+		const product = products.find(product => product.id === productId);
+		return product;
+	};
+
+	async fetchStoreProduct(storeId, productId) {
+		try {
+			const products = await this.readStoreProducts(storeId);
+			const product = products.find(product => product.id === productId);
+			return product;
+		} catch (error) {
+			logger.error(`Failed to read product '${productId}' for store '${storeId}': %s`, error);
+			throw error;
+		}
 	};
 
 	async deleteStoreData(storeId, userId) {
@@ -178,7 +389,7 @@ class StoreController {
 			await this.redisClient.del(`store:${storeId}`);
 			userId && await this.redisClient.srem(`user_stores:${userId}`, storeId);
 		} catch (error) {
-			logger.error(`Failed to delete data for store '${store}': %s`, error);
+			logger.error(`Failed to delete data for store '${storeId}': %s`, error);
 			throw error;
 		}
 	}

@@ -6,6 +6,7 @@ const { google } = require('googleapis');
 const { redis } = require('../clients');
 const GoogleController = require('../controllers/google');
 const axios = require('axios');
+const { formatGoogleDateRange } = require('../utils/date');
 
 const { redisClient } = redis;
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URL, TOKEN_GOOGLE } = process.env;
@@ -79,7 +80,7 @@ router.post("/google-ads/account/connect", auth, storeExists, async (req, res) =
   }
 
   try {
-    await googleController.createGoogleAdsAccount({ ...account, storeId: store });
+    await googleController.storeGoogleAdsAccount({ ...account, storeId: store });
     return res.status(201).json({
       success: true, message: `Google Ads account ${account.name} added to ${store}`
     });
@@ -120,12 +121,11 @@ router.post("/google-ads/ads", auth, storeExists, async (req, res) => {
   };
 
   try {
-    const response = await axios.post(`${process.env.PYEND_URL} / google / ads`, {
+    const response = await axios.post(`${process.env.PYEND_URL}/google-ads/ads`, {
       store: store,
       start,
       end
     })
-
 
     // tem que reordenar aqui por algum motivo, mesmo o python devolvendo em ordem...
     return res.status(200).send({
@@ -159,13 +159,61 @@ router.get('/google-analytics/callback', auth, (req, res) => {
   });
 });
 
+//Connect a google Analytics account to one of the users shops
+router.post("/google-analytics/account/connect", auth, storeExists, async (req, res) => {
+  const { account, store } = req.body;
+  if (!(account)) {
+    return res.status(400).send({ success: false, message: 'Invalid request body' });
+  }
+
+  try {
+    await googleController.storeGoogleAnalyticsProperty({ ...account, storeId: store });
+    return res.status(201).json({
+      success: true, message: `Google Ads account ${account.name} added to ${store}`
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+//Disconnects google Analytics account from a user's shop
+router.get('/google-analytics/account/disconnect', auth, storeExists, async (req, res) => {
+  try {
+    const { store } = req.query;
+    await googleController.deleteGoogleAnalyticsProperty(store);
+    return res.status(201).json({
+      success: true, message: `Google Ads account disconnected from '${store}'`
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  };
+});
+
 router.get('/google-analytics/accounts', auth, storeExists, async (req, res) => {
   try {
     const { store } = req.query;
-    const accounts = await googleController.fetchGoogleAnalyticsAccountList(store);
+    const accounts = await googleController.fetchGoogleAnalyticsPropertiesList(store);
     res.status(200).json(accounts);
   } catch (error) {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+router.get('/google-analytics/product-sessions', auth, storeExists, async (req, res) => {
+  try {
+    const { store, start, end } = req.query;
+    const dateRange = formatGoogleDateRange(start, end);
+    const productPageSessions = await googleController.fetchProductPageSessions(store, dateRange);
+    res.status(200).json(productPageSessions);
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+router.get('/date-range', (req, res) => {
+  const { start, end } = req.query;
+
+  res.json(formatGoogleDateRange(start, end));
+});
+
 module.exports = router;

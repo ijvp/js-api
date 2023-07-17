@@ -5,7 +5,10 @@ const { auth } = require('../middleware/auth');
 const { storeExists } = require('../middleware/store');
 const { shopify, redis } = require('../clients');
 const { encrypt } = require('../utils/crypto');
+const { getStoreApiURL } = require('../utils/shop');
 const StoreController = require('../controllers/store');
+const axios = require('axios');
+const socket = require('../sockets');
 
 const storeController = new StoreController(redis.redisClient);
 
@@ -61,7 +64,7 @@ router.post('/shopify/orders', auth, storeExists, async (req, res) => {
 
 	try {
 		//frontend must set start and end to the same date for a single day of data, granularity must be 'hour'!
-		const orders = await storeController.fetchStoreOrders({ storeId: store, start, end });
+		const orders = await storeController.fetchStoreOrders(store, start, end);
 		return res.json(getMetrics(orders, granularity));
 	} catch (error) {
 		return res.status(500).json({ success: false, error: 'Internal Server Error' });
@@ -97,28 +100,98 @@ router.post('/shopify/most-wanted', auth, async (req, res) => {
 	};
 });
 
+router.post('/shopify/products', auth, storeExists, async (req, res) => {
+	const { store } = req.body;
+	if (!store) {
+		return res.status(400).json({ success: false, message: 'Invalid request body, missing store' })
+	};
+
+	try {
+		const products = await storeController.readStoreProducts(store);
+		return res.json(products);
+	} catch (error) {
+		logger.error(error);
+		return res.status(500).json({ success: false, message: JSON.stringify(error) });
+	}
+});
+
 router.post('/shopify/product', auth, async (req, res) => {
 	const { store, productId } = req.body;
-	if (!productId) {
+	if (!store || !productId) {
 		return res.status(400).json({ success: false, message: 'Invalid request body, missing product id' })
 	};
 
 	try {
-		const storeSession = await getSessionFromStorage(store);
-
-		const product = await shopify.api.rest.Product.find({
-			session: storeSession,
-			id: productId
-		});
-
-		return res.json(product);
+		const product = await storeController.fetchStoreProduct(store, productId);
+		if (product) {
+			return res.json(product);
+		} else {
+			return res.sendStatus(404);
+		}
 	} catch (error) {
 		return res.status(500).json({ success: false, message: JSON.stringify(error) });
 	}
 });
 
-router.get('/shopify/test', (req, res) => {
-	logger.info(req.session);
-	res.json(req.session);
-})
+router.post('/shopify/product-orders', auth, storeExists, async (req, res) => {
+	const { store, productId, start, end } = req.body;
+	if (!store) {
+		return res.status(400).json({ success: false, message: 'Invalid request body, missing store' })
+	};
+
+	try {
+		let orderData;
+		if (productId) {
+			//TODO: return sales data for a single product
+			orderData = await storeController.fetchStoreProductOrdersByProductId(store, productId, start, end);
+		} else {
+			orderData = await storeController.fetchStoreProductOrders(store, start, end);
+		};
+		return res.json(orderData);
+	} catch (error) {
+		logger.error(error);
+		return res.status(500).json({ success: false, message: JSON.stringify(error) });
+	}
+});
+
+router.post('/shopify/import-products', auth, storeExists, async (req, res) => {
+	const { store } = req.body;
+	if (!store) {
+		return res.status(400).json({ success: false, message: 'Invalid request body, missing store' })
+	};
+
+	try {
+		await storeController.submitBulkProductsQuery(store);
+		return res.sendStatus(200);
+	} catch (error) {
+		logger.error(error);
+		return res.status(500).json({ success: false, message: JSON.stringify(error) });
+	}
+});
+
+router.post('/shopify/products-bulk-read', async (req, res) => {
+	try {
+		const {
+			admin_graphql_api_id,
+			completed_at,
+			created_at,
+			error_code,
+			status,
+			type
+		} = req.body;
+		const storeId = req.headers['x-shopify-shop-domain'];
+
+		let products = await storeController.fetchBulkProductsQueryJSONL(storeId, admin_graphql_api_id);
+		products = products.map(product => {
+			let productJSON = JSON.parse(product);
+			productJSON.id = productJSON.id.split("/").slice(-1)[0];
+			return JSON.stringify(productJSON);
+		});
+		await storeController.saveStoreProducts(storeId, products);
+		res.sendStatus(200);
+	} catch (error) {
+		logger.error(error);
+	}
+});
+
 module.exports = router;
