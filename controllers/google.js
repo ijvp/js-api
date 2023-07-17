@@ -114,9 +114,13 @@ class GoogleController {
 
 	async deleteGoogleAdsAcccount(storeId) {
 		try {
-			await this.redisClient.del(`google_ads_account:${storeId}`);
-			logger.info(`Google Ads account hash '${storeId}' deleted`);
-			await this.revokeGoogleAdsAccessFromStore(storeId);
+			const numKeys = await this.redisClient.del(`google_ads_account:${storeId}`);
+			if (numKeys) {
+				logger.info(`Google Ads account hash '${storeId}' deleted`);
+				await this.revokeGoogleAdsAccessFromStore(storeId);
+			} else {
+				logger.info(`No Google Ads account hash '${storeId}' founf`);
+			}
 		} catch (error) {
 			logger.error(error);
 			throw error;
@@ -200,9 +204,14 @@ class GoogleController {
 
 	async deleteGoogleAnalyticsProperty(storeId) {
 		try {
-			await this.redisClient.del(`google_analytics_account:${storeId}`);
-			logger.info(`Google Ads account hash '${storeId}' deleted`);
-			await this.revokeGoogleAnalyticsAccessFromStore(storeId);
+			const numKeys = await this.redisClient.del(`google_analytics_property:${storeId}`);
+			console.log(numKeys);
+			if (numKeys) {
+				logger.info(`Google Analytics property hash '${storeId}' deleted`);
+				await this.revokeGoogleAnalyticsAccessFromStore(storeId);
+			} else {
+				logger.info(`No Google Analytics property hash '${storeId}' found`);
+			}
 		} catch (error) {
 			logger.error(error);
 			throw error;
