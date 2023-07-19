@@ -95,67 +95,67 @@ class FacebookController {
 		}
 	};
 
-	async fetchFacebookAds(storeId, start, end) {
-		try {
-			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
-			const businessId = actId.slice(4) //remove 'act_';
+	// async fetchFacebookAds(storeId, start, end) {
+	// 	try {
+	// 		const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
+	// 		const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
+	// 		const businessId = actId.slice(4) //remove 'act_';
 
-			const campaign = {
-				id: 'facebook-ads.ads-metrics',
-				metricsBreakdown: []
-			};
+	// 		const campaign = {
+	// 			id: 'facebook-ads.ads-metrics',
+	// 			metricsBreakdown: []
+	// 		};
 
-			const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start))) === 0;
-			const since = start.split("T")[0];
-			const until = end.split("T")[0];
+	// 		const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start))) === 0;
+	// 		const since = start.split("T")[0];
+	// 		const until = end.split("T")[0];
 
-			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/insights`;
-			let params = {
-				time_range: { since, until },
-				level: "account",
-				fields: "campaign_name,adset_name,ad_name,spend,purchase_roas",
-				access_token: facebookAccessToken
-			};
+	// 		let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/insights`;
+	// 		let params = {
+	// 			time_range: { since, until },
+	// 			level: "account",
+	// 			fields: "campaign_name,adset_name,ad_name,spend,purchase_roas",
+	// 			access_token: facebookAccessToken
+	// 		};
 
-			if (!isSingleDay) {
-				params.time_increment = 1;
-			} else {
-				params.breakdowns = "hourly_stats_aggregated_by_advertiser_time_zone";
-			};
+	// 		if (!isSingleDay) {
+	// 			params.time_increment = 1;
+	// 		} else {
+	// 			params.breakdowns = "hourly_stats_aggregated_by_advertiser_time_zone";
+	// 		};
 
-			try {
-				do {
-					const response = await axios.get(url, { params: params });
-					let resData = response.data.data;
-					resData.forEach(data => {
-						let indexHour;
-						if (isSingleDay) {
-							indexHour = data.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
-						}
+	// 		try {
+	// 			do {
+	// 				const response = await axios.get(url, { params: params });
+	// 				let resData = response.data.data;
+	// 				resData.forEach(data => {
+	// 					let indexHour;
+	// 					if (isSingleDay) {
+	// 						indexHour = data.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
+	// 					}
 
-						const dailyDataDate = !isSingleDay ? `${data.date_start}` : `${data.date_start}T${indexHour}`;
-						let dailyData = {
-							date: dailyDataDate,
-							metrics: {
-								spend: parseFloat(data.spend),
-							}
-						}
-						campaign.metricsBreakdown.push(dailyData);
-					})
-					url = response.data.paging?.next;
-				} while (url);
+	// 					const dailyDataDate = !isSingleDay ? `${data.date_start}` : `${data.date_start}T${indexHour}`;
+	// 					let dailyData = {
+	// 						date: dailyDataDate,
+	// 						metrics: {
+	// 							spend: parseFloat(data.spend),
+	// 						}
+	// 					}
+	// 					campaign.metricsBreakdown.push(dailyData);
+	// 				})
+	// 				url = response.data.paging?.next;
+	// 			} while (url);
 
-				return campaign;
-			} catch (error) {
-				logger.error(error.response.data.error.message);
-				throw error;
-			}
-		} catch (error) {
-			logger.error(error);
-			throw error;
-		}
-	};
+	// 			return campaign;
+	// 		} catch (error) {
+	// 			logger.error(error.response.data.error.message);
+	// 			throw error;
+	// 		}
+	// 	} catch (error) {
+	// 		logger.error(error);
+	// 		throw error;
+	// 	}
+	// };
 
 	async fetchActiveFacebookCampaigns(storeId) {
 		try {
@@ -196,6 +196,70 @@ class FacebookController {
 			return response.data;
 		} catch (error) {
 			logger.error(error);
+			throw error;
+		}
+	};
+
+	async fetchFacebookAds(storeId, adSetId) {
+		try {
+			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
+			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${adSetId}/ads`;
+
+			const response = await axios.get(url, {
+				params: {
+					access_token: facebookAccessToken,
+					fields: 'name,creative',
+				}
+			});
+
+			return response.data.data;
+		} catch (error) {
+			logger.error(error);
+			throw error;
+		}
+	};
+
+	async fetchFacebookAdsInsights(storeId, adNameQuery, timeRange) {
+		try {
+			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
+			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/insights`;
+
+
+			const filters = [{ 'field': 'action_type', 'operator': 'IN', 'value': ['purchase', 'landing_page_view', 'outbound_clicks'] }];
+			if (adNameQuery) filters.push({ 'field': 'ad.name', 'operator': 'CONTAIN', 'value': adNameQuery })
+			const response = await axios.get(url, {
+				params: {
+					access_token: facebookAccessToken,
+					level: 'ad',
+					fields: 'ad_id,ad_name,spend,impressions,outbound_clicks,purchase_roas,actions',
+					filtering: filters,
+					time_range: timeRange
+				}
+			});
+
+			const { data: adInsightsData } = response.data;
+			const adInsights = adInsightsData.map(adInsightData => {
+				const purchaseROAsAction = adInsightData.purchase_roas?.find(purchaseRoas => purchaseRoas.action_type === 'omni_purchase');
+				const outboundClickAction = adInsightData.outbound_clicks?.find(outboundClick => outboundClick.action_type === 'outbound_click');
+
+				return {
+					id: adInsightData.ad_id,
+					name: adInsightData.ad_name,
+					spend: Number(adInsightData.spend) || 0,
+					impressions: Number(adInsightData.impressions) || 0,
+					clicks: Number(outboundClickAction?.value) || 0,
+					purchasesConversionValue: Number(adInsightData.spend * purchaseROAsAction?.value) || 0,
+					CTR: Number(outboundClickAction?.value / adInsightData.impressions * 100) || 0,
+					CPS: Number(adInsightData.spend / (adInsightData.actions?.find(action => action.action_type === 'landing_page_view')?.value)) || 0,
+					CPA: Number(adInsightData.spend / (adInsightData.actions?.find(action => action.action_type === 'purchase')?.value)) || 0,
+					ROAS: Number(purchaseROAsAction?.value) || 0,
+				}
+			})
+			return adInsights;
+		} catch (error) {
+			logger.error('Error retrieving Facebook Ads insights: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
