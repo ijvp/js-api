@@ -224,38 +224,48 @@ class FacebookController {
 		try {
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
 			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
-			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/insights`;
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/ads`;
 
+			const adCreativesFields = 'name,thumbnail_url'
+			const insightsFields = 'ad_id,ad_name,spend,impressions,outbound_clicks,purchase_roas,actions';
+			const insightsFilters = [{ 'field': 'action_type', 'operator': 'IN', 'value': ['purchase', 'omni_purchase', 'landing_page_view', 'outbound_click'] }];
+			const filters = [];
+			const limit = 250;
+			if (adNameQuery) filters.push({ 'field': 'ad.name', 'operator': 'CONTAIN', 'value': adNameQuery });
 
-			const filters = [{ 'field': 'action_type', 'operator': 'IN', 'value': ['purchase', 'landing_page_view', 'outbound_clicks'] }];
-			if (adNameQuery) filters.push({ 'field': 'ad.name', 'operator': 'CONTAIN', 'value': adNameQuery })
 			const response = await axios.get(url, {
 				params: {
 					access_token: facebookAccessToken,
-					level: 'ad',
-					fields: 'ad_id,ad_name,spend,impressions,outbound_clicks,purchase_roas,actions',
+					fields: `adcreatives{${adCreativesFields}},insights.fields(${insightsFields}).filtering(${JSON.stringify(insightsFilters)})`,
 					filtering: filters,
+					limit,
 					time_range: timeRange
 				}
 			});
 
 			const { data: adInsightsData } = response.data;
 			const adInsights = adInsightsData.map(adInsightData => {
-				const purchaseROAsAction = adInsightData.purchase_roas?.find(purchaseRoas => purchaseRoas.action_type === 'omni_purchase');
-				const outboundClickAction = adInsightData.outbound_clicks?.find(outboundClick => outboundClick.action_type === 'outbound_click');
+				const { id, name, adcreatives, insights } = adInsightData;
+				const creativeData = adcreatives?.data[0];
+				const insightData = insights?.data[0];
+				const purchaseROAsAction = insightData?.purchase_roas?.find(purchaseRoas => purchaseRoas.action_type === 'omni_purchase');
+				const outboundClickAction = insightData?.outbound_clicks?.find(outboundClick => outboundClick.action_type === 'outbound_click');
 
 				return {
-					id: adInsightData.ad_id,
-					name: adInsightData.ad_name,
-					spend: Number(adInsightData.spend) || 0,
-					impressions: Number(adInsightData.impressions) || 0,
+					id,
+					name,
+					creativeId: creativeData.id,
+					creativeName: creativeData.name,
+					creativeThumbnail: creativeData.thumbnail_url,
+					spend: Number(insightData?.spend) || 0,
+					impressions: Number(insightData?.impressions) || 0,
 					outboundClicks: Number(outboundClickAction?.value) || 0,
-					pageViews: Number((adInsightData.actions?.find(action => action.action_type === 'landing_page_view')?.value)) || 0,
-					purchases: Number(adInsightData.actions?.find(action => action.action_type === 'purchase')?.value) || 0,
-					purchasesConversionValue: Number(adInsightData.spend * purchaseROAsAction?.value) || 0,
-					CTR: Number(outboundClickAction?.value / adInsightData.impressions * 100) || 0,
-					CPS: Number(adInsightData.spend / (adInsightData.actions?.find(action => action.action_type === 'landing_page_view')?.value)) || 0,
-					CPA: Number(adInsightData.spend / (adInsightData.actions?.find(action => action.action_type === 'purchase')?.value)) || 0,
+					pageViews: Number((insightData?.actions?.find(action => action.action_type === 'landing_page_view')?.value)) || 0,
+					purchases: Number((insightData?.actions?.find(action => action.action_type === 'purchase')?.value)) || 0,
+					purchasesConversionValue: Number(insightData?.spend * purchaseROAsAction?.value) || 0,
+					CTR: Number(outboundClickAction?.value / insightData?.impressions * 100) || 0,
+					CPS: Number(insightData?.spend / (insightData?.actions?.find(action => action.action_type === 'landing_page_view')?.value)) || 0,
+					CPA: Number(insightData?.spend / (insightData?.actions?.find(action => action.action_type === 'purchase')?.value)) || 0,
 					ROAS: Number(purchaseROAsAction?.value) || 0,
 				}
 			})
