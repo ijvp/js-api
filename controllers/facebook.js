@@ -227,7 +227,7 @@ class FacebookController {
 			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/ads`;
 
 			const adCreativesFields = 'name,thumbnail_url'
-			const insightsFields = 'ad_id,ad_name,spend,impressions,outbound_clicks,purchase_roas,actions';
+			const insightsFields = 'spend,impressions,outbound_clicks,purchase_roas,actions';
 			const insightsFilters = [{ 'field': 'action_type', 'operator': 'IN', 'value': ['purchase', 'omni_purchase', 'landing_page_view', 'outbound_click'] }];
 			const filters = [];
 			const limit = 250;
@@ -236,7 +236,7 @@ class FacebookController {
 			const response = await axios.get(url, {
 				params: {
 					access_token: facebookAccessToken,
-					fields: `adcreatives{${adCreativesFields}},insights.fields(${insightsFields}).filtering(${JSON.stringify(insightsFilters)})`,
+					fields: `id,name,adcreatives.fields(${adCreativesFields}).thumbnail_width(256).thumbnail_height(256),insights.fields(${insightsFields}).filtering(${JSON.stringify(insightsFilters)})`,
 					filtering: filters,
 					limit,
 					time_range: timeRange
@@ -272,7 +272,7 @@ class FacebookController {
 			return adInsights;
 		} catch (error) {
 			logger.error('Error retrieving Facebook Ads insights: %s', error.response?.data?.error.message || error);
-			throw error;
+			throw error.response?.data?.error.message || error;
 		}
 	};
 };

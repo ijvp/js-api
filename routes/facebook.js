@@ -42,7 +42,7 @@ router.get("/facebook/callback", auth, async (req, res) => {
 
       try {
         await facebookController.grantFacebookAccessToStore(shop, response.data.access_token);
-        return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=facebook&store=${shop}`);
+        return res.redirect(`${process.env.FRONTEND_URL}/integracoes?platform=facebook&store=${shop}`);
       } catch (error) {
         logger.error(error);
         return res.status(500).json({ success: false, message: "Internal Server Error" });

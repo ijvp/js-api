@@ -64,7 +64,7 @@ router.get('/google-ads/callback', auth, (req, res) => {
 
     try {
       await googleController.grantGoogleAdsAccessToStore(shop, token);
-      return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google-ads&store=${shop}`);
+      return res.redirect(`${process.env.FRONTEND_URL}/integracoes?platform=google-ads&store=${shop}`);
     } catch (error) {
       logger.error(error);
       return res.status(500).json({ success: false, message: "Internal Server Error" })
@@ -151,7 +151,7 @@ router.get('/google-analytics/callback', auth, (req, res) => {
 
     try {
       await googleController.grantGoogleAnalyticsAccessToStore(shop, token);
-      return res.redirect(`${process.env.FRONTEND_URL}/integrations?platform=google-analytics&store=${shop}`);
+      return res.redirect(`${process.env.FRONTEND_URL}/integracoes?platform=google-analytics&store=${shop}`);
     } catch (error) {
       logger.error(error);
       return res.status(500).json({ success: false, message: "Internal Server Error" })
