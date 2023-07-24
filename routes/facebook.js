@@ -164,15 +164,17 @@ router.post("/facebook/ad-sets", auth, storeExists, async (req, res) => {
 });
 
 router.post("/facebook/ads", auth, storeExists, async (req, res) => {
-  const { store } = req.body;
+  const { store, start, end } = req.body;
 
-  if (!store) {
+  if (!store || !start || !end) {
     return res.status(400).json({ success: false, message: 'Invalid request body' });
   };
+
 
   try {
     const ads = [];
     const adSets = [];
+    const timeRange = { since: start, until: end }
     const { data: campaigns } = await facebookController.fetchActiveFacebookCampaigns(store);
 
     const adSetsPromises = campaigns.map(async campaign => {
@@ -184,7 +186,7 @@ router.post("/facebook/ads", auth, storeExists, async (req, res) => {
     const sets = [];
     adSets.forEach(set => sets.push(...set.adSets));
     const adsPromises = sets.map(async set => {
-      const ads = await facebookController.fetchFacebookAds(store, set.id);
+      const ads = await facebookController.fetchFacebookAds(store, set.id, timeRange);
       return { adSetId: set.id, adSetName: set.name, ads };
     });
 
