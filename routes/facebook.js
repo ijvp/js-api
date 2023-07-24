@@ -205,7 +205,7 @@ router.post("/facebook/ad-insights", auth, storeExists, async (req, res) => {
   };
 
   try {
-    const timeRange = { 'since': start, 'until': end }
+    const timeRange = { since: start, until: end }
     const adInsights = await facebookController.fetchFacebookAdsInsights(store, adName, timeRange);
     return res.json(adInsights);
   } catch (error) {

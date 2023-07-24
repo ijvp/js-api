@@ -222,6 +222,17 @@ class FacebookController {
 
 	async fetchFacebookAdsInsights(storeId, adNameQuery, timeRange) {
 		try {
+			const timeRangeKey = `${timeRange.since}__${timeRange.until}`;
+			const cacheKey = `facebook_ads_insights:${storeId}:${timeRangeKey}`;
+			const cacheDuration = 1800;
+
+			const cachedAdsInsights = await this.redisClient.get(cacheKey);
+			if (cachedAdsInsights) {
+				const parsedAdsInsights = JSON.parse(cachedAdsInsights);
+				logger.info(`Fetched Facebook Ads insights '${storeId}-${timeRangeKey}' from cache.`);
+				return parsedAdsInsights;
+			}
+
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
 			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
 			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/ads`;
@@ -233,13 +244,13 @@ class FacebookController {
 			const limit = 250;
 			if (adNameQuery) filters.push({ 'field': 'ad.name', 'operator': 'CONTAIN', 'value': adNameQuery });
 
+
 			const response = await axios.get(url, {
 				params: {
 					access_token: facebookAccessToken,
-					fields: `id,name,adcreatives.fields(${adCreativesFields}).thumbnail_width(256).thumbnail_height(256),insights.fields(${insightsFields}).filtering(${JSON.stringify(insightsFilters)})`,
+					fields: `id,name,adcreatives.fields(${adCreativesFields}).thumbnail_width(256).thumbnail_height(256),insights.fields(${insightsFields}).filtering(${JSON.stringify(insightsFilters)}).time_range(${JSON.stringify(timeRange)})`,
 					filtering: filters,
-					limit,
-					time_range: timeRange
+					limit
 				}
 			});
 
@@ -269,6 +280,9 @@ class FacebookController {
 					ROAS: Number(purchaseROAsAction?.value) || 0,
 				}
 			})
+
+			await this.redisClient.set(cacheKey, JSON.stringify(adInsights), 'ex', cacheDuration);
+			logger.info(`Facebook Ads insights for '${storeId}-${timeRangeKey}' cached.`);
 			return adInsights;
 		} catch (error) {
 			logger.error('Error retrieving Facebook Ads insights: %s', error.response?.data?.error.message || error);
