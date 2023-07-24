@@ -230,7 +230,7 @@ class FacebookController {
 			if (cachedAdsInsights) {
 				const parsedAdsInsights = JSON.parse(cachedAdsInsights);
 				const ttl = await this.redisClient.ttl(cacheKey);
-				logger.info(`Fetched Facebook Ads insights '${storeId}-${timeRangeKey}' from cache. TTL: ${ttl}`);
+				logger.info(`Fetched Facebook Ads insights '${storeId}:${timeRangeKey}' from cache. TTL: ${ttl}`);
 				return { adInsights: parsedAdsInsights, ttl };
 			}
 
