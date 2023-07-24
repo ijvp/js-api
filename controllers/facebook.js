@@ -229,8 +229,9 @@ class FacebookController {
 			const cachedAdsInsights = await this.redisClient.get(cacheKey);
 			if (cachedAdsInsights) {
 				const parsedAdsInsights = JSON.parse(cachedAdsInsights);
-				logger.info(`Fetched Facebook Ads insights '${storeId}-${timeRangeKey}' from cache.`);
-				return parsedAdsInsights;
+				const ttl = await this.redisClient.ttl(cacheKey);
+				logger.info(`Fetched Facebook Ads insights '${storeId}-${timeRangeKey}' from cache. TTL: ${ttl}`);
+				return { adInsights: parsedAdsInsights, ttl };
 			}
 
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
@@ -282,8 +283,8 @@ class FacebookController {
 			})
 
 			await this.redisClient.set(cacheKey, JSON.stringify(adInsights), 'ex', cacheDuration);
-			logger.info(`Facebook Ads insights for '${storeId}-${timeRangeKey}' cached.`);
-			return adInsights;
+			logger.info(`Facebook Ads insights for '${storeId}-${timeRangeKey}' cached. TTL: ${cacheDuration}`);
+			return { adInsights, ttl: cacheDuration };
 		} catch (error) {
 			logger.error('Error retrieving Facebook Ads insights: %s', error.response?.data?.error.message || error);
 			throw error.response?.data?.error.message || error;
