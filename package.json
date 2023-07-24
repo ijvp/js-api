@@ -6,7 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "export NODE_ENV=development && nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "docker": "docker network create dashboard-network && docker-compose -f docker/docker-compose.yml up --build -d && docker-compose up",
+    "dockerDown": "docker-compose down && docker-compose -f docker/docker-compose.yml down && docker network rm dashboard-network",
+    "redis": "docker-compose -f docker/docker-compose.yml up -d",
+    "redisDown": "docker-compose -f docker/docker-compose.yml down"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +31,7 @@
     "express-session": "^1.17.3",
     "google-ads-api": "^12.0.1",
     "googleapis": "^110.0.0",
+    "http": "^0.0.1-security",
     "ioredis": "^5.3.2",
     "moment": "^2.29.4",
     "mongoose": "^6.9.0",
@@ -35,7 +40,8 @@
     "passport-local-mongoose": "^7.1.2",
     "pino": "^8.12.0",
     "pino-pretty": "^10.0.0",
-    "redis-om": "^0.3.6"
+    "redis-om": "^0.3.6",
+    "socket.io": "^4.7.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

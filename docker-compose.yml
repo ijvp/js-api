@@ -1,11 +1,15 @@
 version: '3'
 services:
-  redis:
+  api-js:
+    container_name: "dashboard-api-js"
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - '6379:6379'
+      - 8080:8080
+    restart: always
+    volumes:
+      - .:/app
     networks:
       - dashboard-network
 
