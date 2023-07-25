@@ -211,7 +211,9 @@ class FacebookController {
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
 			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${adSetId}/ads`;
 
-			const isSingleDay = differenceInDays(new Date(timeRange.until), new Date(timeRange.since)) === 0;
+			const daysDiff = differenceInDays(new Date(timeRange.until), new Date(timeRange.since));
+			const isSingleDay = daysDiff === 0;
+
 			const insightsSegmentation = isSingleDay ? '.breakdowns(hourly_stats_aggregated_by_advertiser_time_zone)' : '.time_increment(1)'
 
 			let params = {

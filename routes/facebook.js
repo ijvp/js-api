@@ -163,13 +163,12 @@ router.post("/facebook/ad-sets", auth, storeExists, async (req, res) => {
   }
 });
 
-router.post("/facebook/ads", auth, storeExists, async (req, res) => {
-  const { store, start, end } = req.body;
+router.post("/facebook/ad-expenses", auth, storeExists, async (req, res) => {
+  const { store, start, end, granularity } = req.body;
 
   if (!store || !start || !end) {
     return res.status(400).json({ success: false, message: 'Invalid request body' });
   };
-
 
   try {
     const ads = [];
@@ -187,12 +186,23 @@ router.post("/facebook/ads", auth, storeExists, async (req, res) => {
     adSets.forEach(set => sets.push(...set.adSets));
     const adsPromises = sets.map(async set => {
       const ads = await facebookController.fetchFacebookAds(store, set.id, timeRange);
-      return { adSetId: set.id, adSetName: set.name, ads };
+      return ads;
     });
 
     ads.push(...await Promise.all(adsPromises));
+    const adsMetrics = {};
+    ads.forEach(ad => {
+      ad.metricsBreakdown.forEach(metricBreakdown => {
+        const { date, metrics } = metricBreakdown;
+        if (date in adsMetrics) {
+          adsMetrics[date].spend = parseFloat((adsMetrics[date].spend + parseFloat(metrics.spend)).toFixed(2));
+        } else {
+          adsMetrics[date] = { spend: parseFloat(metrics.spend) };
+        }
+      })
+    });
 
-    return res.json(ads);
+    return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })) });
   } catch (error) {
     logger.error(error);
     return res.status(500).json({ success: false, error: "Internal server error" });

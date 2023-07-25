@@ -115,8 +115,8 @@ router.get('/google-ads/accounts', auth, storeExists, async (req, res) => {
   }
 });
 
-router.post("/google-ads/ads", auth, storeExists, async (req, res) => {
-  const { start, end, store } = req.body;
+router.post("/google-ads/ad-expenses", auth, storeExists, async (req, res) => {
+  const { start, end, store, granularity } = req.body;
 
   if (!start && !end) {
     return res.status(400).send('Start date and end date must be set');
