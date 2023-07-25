@@ -200,20 +200,48 @@ class FacebookController {
 		}
 	};
 
-	async fetchFacebookAds(storeId, adSetId) {
+	async fetchFacebookAds(storeId, adSetId, timeRange) {
 		try {
+			let adsMetrics = {
+				id: '',
+				name: '',
+				metricsBreakdown: []
+			};
+
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
 			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${adSetId}/ads`;
 
-			const response = await axios.get(url, {
-				params: {
-					access_token: facebookAccessToken,
-					fields: 'name,creative',
-				}
+			const isSingleDay = differenceInDays(new Date(timeRange.until), new Date(timeRange.since)) === 0;
+			const insightsSegmentation = isSingleDay ? '.breakdowns(hourly_stats_aggregated_by_advertiser_time_zone)' : '.time_increment(1)'
+
+			let params = {
+				access_token: facebookAccessToken,
+				fields: `id,name,creative,insights.fields(spend).level(account).time_range(${JSON.stringify(timeRange)})${insightsSegmentation}`,
+			};
+
+			const { data } = await axios.get(url, {
+				params
+			});
+			data.data.forEach(data => {
+				let indexHour;
+				data.insights?.data?.forEach(insight => {
+					if (isSingleDay) {
+						indexHour = insight.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
+					}
+
+					let intervalData = {
+						date: isSingleDay ? `${insight.date_start}T${indexHour}` : `${insight.date_start}`,
+						metrics: {
+							spend: insight.spend || 0
+						}
+					}
+					adsMetrics.id = data.id;
+					adsMetrics.name = data.name;
+					adsMetrics.metricsBreakdown.push(intervalData);
+				})
 			});
 
-			return response.data.data;
+			return adsMetrics;
 		} catch (error) {
 			logger.error(error);
 			throw error;
