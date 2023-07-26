@@ -29,6 +29,7 @@ router.post('/auth/register', async (req, res) => {
 		await storeController.associateStoreWithUser(storeId, user.id);
 	};
 
+	console.log("CALLED LOGIN ROUTE", user.id);
 	logIn(req, user.id);
 	res.status(201).json({ success: true, message: `User '${user.username}' was created successfully` });
 });
