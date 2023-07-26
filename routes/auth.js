@@ -36,6 +36,8 @@ router.post('/auth/register', async (req, res) => {
 router.post('/auth/login', async (req, res) => {
 	const { username, password } = req.body;
 
+	console.log(username)
+
 	try {
 		const found = await User.findOne({ username });
 		const passwordsMatch = await found?.matchesPassword(password);
