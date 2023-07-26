@@ -1,5 +1,6 @@
 const logIn = async (req, userId) => {
 	req.session.userId = userId;
+	console.log(req.session.userId)
 	req.session.save();
 };
 
