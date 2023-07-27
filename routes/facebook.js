@@ -133,7 +133,6 @@ router.post("/facebook/campaigns", auth, storeExists, async (req, res) => {
     const campaigns = await facebookController.fetchActiveFacebookCampaigns(store);
     return res.json(campaigns);
   } catch (error) {
-    logger.error(error);
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
@@ -158,7 +157,6 @@ router.post("/facebook/ad-sets", auth, storeExists, async (req, res) => {
 
     return res.json(adSets);
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
@@ -204,7 +202,6 @@ router.post("/facebook/ad-expenses", auth, storeExists, async (req, res) => {
 
     return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })) });
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });

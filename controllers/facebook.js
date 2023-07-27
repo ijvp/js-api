@@ -69,7 +69,7 @@ class FacebookController {
 			);
 			return facebookAdsAccount;
 		} catch (error) {
-			logger.error('Error retrieving Facebook Ads Account: %s', error);
+			logger.error('Error retrieving Facebook Ads account: %s', error);
 			throw error;
 		};
 	};
@@ -174,7 +174,7 @@ class FacebookController {
 
 			return response.data;
 		} catch (error) {
-			logger.error(error);
+			logger.error('Error retrieving Facebook campaigns: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
@@ -195,7 +195,7 @@ class FacebookController {
 
 			return response.data;
 		} catch (error) {
-			logger.error(error);
+			logger.error('Error retrieving Facebook ad sets: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
@@ -245,7 +245,7 @@ class FacebookController {
 
 			return adsMetrics;
 		} catch (error) {
-			logger.error(error);
+			logger.error('Error retrieving Facebook ads: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
@@ -316,7 +316,7 @@ class FacebookController {
 			logger.info(`Facebook Ads insights for '${storeId}-${timeRangeKey}' cached. TTL: ${cacheDuration}`);
 			return { adInsights, ttl: cacheDuration };
 		} catch (error) {
-			logger.error('Error retrieving Facebook Ads insights: %s', error.response?.data?.error.message || error);
+			logger.error('Error retrieving Facebook ads insights: %s', error.response?.data?.error.message || error);
 			throw error.response?.data?.error.message || error;
 		}
 	};

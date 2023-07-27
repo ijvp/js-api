@@ -7,6 +7,7 @@ const session = require('express-session');
 const passport = require('passport');
 const http = require('http');
 const socket = require('./sockets');
+
 //modules
 const { redisStore } = require('./clients');
 
@@ -17,6 +18,9 @@ const googleRoutes = require('./routes/google');
 const facebookRoutes = require('./routes/facebook');
 const userRoutes = require('./routes/user');
 const gdprRoutes = require('./routes/gdpr');
+
+// middleware
+const { errorHandler } = require('./middleware/auth');
 
 // utils
 const connect = require('./utils/connect');
@@ -95,6 +99,8 @@ app.use('/', googleRoutes);
 app.use('/', facebookRoutes);
 app.use('/', userRoutes);
 app.use('/', gdprRoutes);
+
+app.use(errorHandler);
 
 server.listen(port, () => {
 	logger.info('NODE ENV: %s', process.env.NODE_ENV);
