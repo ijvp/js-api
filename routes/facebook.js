@@ -147,38 +147,20 @@ router.post("/facebook/ad-expenses", auth, storeExists, async (req, res) => {
   };
 
   try {
-    const ads = [];
-    const adSets = [];
-    const timeRange = { since: start, until: end }
-    const { data: campaigns } = await facebookController.fetchActiveFacebookCampaigns(store);
-
-    const adSetsPromises = campaigns.map(async campaign => {
-      const campaignAdSets = await facebookController.fetchFacebookCampaignAdSets(store, campaign.id);
-      return { campaignId: campaign.id, campaignName: campaign.name, adSets: campaignAdSets.data };
-    });
-
-    adSets.push(...await Promise.all(adSetsPromises));
-    const sets = [];
-    adSets.forEach(set => sets.push(...set.adSets));
-    const adsPromises = sets.map(async set => {
-      const ads = await facebookController.fetchFacebookAdsExpenses(store, set.id, timeRange);
-      return ads;
-    });
-
-    ads.push(...await Promise.all(adsPromises));
     const adsMetrics = {};
-    ads.forEach(ad => {
-      ad.metricsBreakdown.forEach(metricBreakdown => {
-        const { date, metrics } = metricBreakdown;
-        if (date in adsMetrics) {
-          adsMetrics[date].spend = parseFloat((adsMetrics[date].spend + parseFloat(metrics.spend)).toFixed(2));
-        } else {
-          adsMetrics[date] = { spend: parseFloat(metrics.spend) };
-        }
-      })
+    const timeRange = { since: start, until: end }
+    const adsExpenses = await facebookController.fetchFacebookAdsExpenses(store, timeRange);
+
+    adsExpenses.adsMetrics.metricsBreakdown.forEach(metricBreakdown => {
+      const { date, metrics } = metricBreakdown;
+      if (date in adsMetrics) {
+        adsMetrics[date].spend = parseFloat((adsMetrics[date].spend + parseFloat(metrics.spend)).toFixed(2));
+      } else {
+        adsMetrics[date] = { spend: parseFloat(metrics.spend) };
+      }
     });
 
-    return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })) });
+    return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })), ttl: adsExpenses.ttl });
   } catch (error) {
     return res.status(500).json({ success: false, error: "Internal server error" });
   }

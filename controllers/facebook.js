@@ -138,7 +138,7 @@ class FacebookController {
 		}
 	};
 
-	async fetchFacebookAdsExpenses(storeId, adSetId, timeRange) {
+	async fetchFacebookAdsExpenses(storeId, timeRange) {
 		try {
 			const timeRangeKey = `${timeRange.since}__${timeRange.until}`;
 			const cacheKey = `facebook_ads_expenses:${storeId}:${timeRangeKey}`;
@@ -149,7 +149,7 @@ class FacebookController {
 				const parsedAdsExpenses = JSON.parse(cachedAdsExpenses);
 				const ttl = await this.redisClient.ttl(cacheKey);
 				logger.info(`Fetched Facebook Ads expenses '${storeId}:${timeRangeKey}' from cache. TTL: ${ttl}`);
-				return { adsExpenses: parsedAdsExpenses, ttl };
+				return { adsMetrics: parsedAdsExpenses, ttl };
 			}
 
 			let adsMetrics = {
@@ -159,7 +159,8 @@ class FacebookController {
 			};
 
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${adSetId}/ads`;
+			const accountId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id');
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${accountId}/ads`;
 
 			const daysDiff = differenceInDays(new Date(timeRange.until), new Date(timeRange.since));
 			const isSingleDay = daysDiff === 0;
