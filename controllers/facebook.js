@@ -95,68 +95,6 @@ class FacebookController {
 		}
 	};
 
-	// async fetchFacebookAds(storeId, start, end) {
-	// 	try {
-	// 		const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-	// 		const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
-	// 		const businessId = actId.slice(4) //remove 'act_';
-
-	// 		const campaign = {
-	// 			id: 'facebook-ads.ads-metrics',
-	// 			metricsBreakdown: []
-	// 		};
-
-	// 		const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start))) === 0;
-	// 		const since = start.split("T")[0];
-	// 		const until = end.split("T")[0];
-
-	// 		let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/insights`;
-	// 		let params = {
-	// 			time_range: { since, until },
-	// 			level: "account",
-	// 			fields: "campaign_name,adset_name,ad_name,spend,purchase_roas",
-	// 			access_token: facebookAccessToken
-	// 		};
-
-	// 		if (!isSingleDay) {
-	// 			params.time_increment = 1;
-	// 		} else {
-	// 			params.breakdowns = "hourly_stats_aggregated_by_advertiser_time_zone";
-	// 		};
-
-	// 		try {
-	// 			do {
-	// 				const response = await axios.get(url, { params: params });
-	// 				let resData = response.data.data;
-	// 				resData.forEach(data => {
-	// 					let indexHour;
-	// 					if (isSingleDay) {
-	// 						indexHour = data.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
-	// 					}
-
-	// 					const dailyDataDate = !isSingleDay ? `${data.date_start}` : `${data.date_start}T${indexHour}`;
-	// 					let dailyData = {
-	// 						date: dailyDataDate,
-	// 						metrics: {
-	// 							spend: parseFloat(data.spend),
-	// 						}
-	// 					}
-	// 					campaign.metricsBreakdown.push(dailyData);
-	// 				})
-	// 				url = response.data.paging?.next;
-	// 			} while (url);
-
-	// 			return campaign;
-	// 		} catch (error) {
-	// 			logger.error(error.response.data.error.message);
-	// 			throw error;
-	// 		}
-	// 	} catch (error) {
-	// 		logger.error(error);
-	// 		throw error;
-	// 	}
-	// };
-
 	async fetchActiveFacebookCampaigns(storeId) {
 		try {
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
@@ -200,8 +138,20 @@ class FacebookController {
 		}
 	};
 
-	async fetchFacebookAds(storeId, adSetId, timeRange) {
+	async fetchFacebookAdsExpenses(storeId, adSetId, timeRange) {
 		try {
+			const timeRangeKey = `${timeRange.since}__${timeRange.until}`;
+			const cacheKey = `facebook_ads_expenses:${storeId}:${timeRangeKey}`;
+			const cacheDuration = 600;
+
+			const cachedAdsExpenses = await this.redisClient.get(cacheKey);
+			if (cachedAdsExpenses) {
+				const parsedAdsExpenses = JSON.parse(cachedAdsExpenses);
+				const ttl = await this.redisClient.ttl(cacheKey);
+				logger.info(`Fetched Facebook Ads expenses '${storeId}:${timeRangeKey}' from cache. TTL: ${ttl}`);
+				return { adsExpenses: parsedAdsExpenses, ttl };
+			}
+
 			let adsMetrics = {
 				id: '',
 				name: '',
@@ -243,9 +193,11 @@ class FacebookController {
 				})
 			});
 
-			return adsMetrics;
+			await this.redisClient.set(cacheKey, JSON.stringify(adsMetrics), 'ex', cacheDuration);
+			logger.info(`Facebook Ads expenses for '${storeId}:${timeRangeKey}' cached. TTL: ${cacheDuration}`);
+			return { adsMetrics, ttl: cacheDuration };
 		} catch (error) {
-			logger.error('Error retrieving Facebook ads: %s', error.response?.data?.error.message || error);
+			logger.error('Error retrieving Facebook Ads expenses: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
@@ -313,10 +265,10 @@ class FacebookController {
 			})
 
 			await this.redisClient.set(cacheKey, JSON.stringify(adInsights), 'ex', cacheDuration);
-			logger.info(`Facebook Ads insights for '${storeId}-${timeRangeKey}' cached. TTL: ${cacheDuration}`);
+			logger.info(`Facebook Ads insights for '${storeId}:${timeRangeKey}' cached. TTL: ${cacheDuration}`);
 			return { adInsights, ttl: cacheDuration };
 		} catch (error) {
-			logger.error('Error retrieving Facebook ads insights: %s', error.response?.data?.error.message || error);
+			logger.error('Error retrieving Facebook Ads insights: %s', error.response?.data?.error.message || error);
 			throw error.response?.data?.error.message || error;
 		}
 	};

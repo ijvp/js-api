@@ -100,28 +100,6 @@ router.get("/facebook/account/disconnect", auth, storeExists, async (req, res) =
   };
 });
 
-//Rota para buscar os gastos, e o roas de uma conta no facebook business
-// Tem que ser enviado o id da loja, a rota usa o access token do usuario a rota usa o access token do usuário ao id do das cotas administradas pelo usuário logado 
-// O startDate e o endDate tem que ser enviados no padrão yyyy-mm-dd
-// router.post("/facebook/ads", auth, storeExists, async (req, res) => {
-//   const { store, start, end } = req.body;
-
-//   if (!start && !end) {
-//     return res.status(400).json({ success: false, message: 'Invalid request body' });
-//   }
-
-//   try {
-//     const ads = await facebookController.fetchFacebookAds(store, start, end);
-//     return res.status(200).send({
-//       ...ads, metricsBreakdown: ads.metricsBreakdown.sort((a, b) => {
-//         return new Date(a.date) - new Date(b.date);
-//       })
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, message: 'Internal server error' });
-//   };
-// });
-
 router.post("/facebook/campaigns", auth, storeExists, async (req, res) => {
   const { store } = req.body;
 
@@ -183,7 +161,7 @@ router.post("/facebook/ad-expenses", auth, storeExists, async (req, res) => {
     const sets = [];
     adSets.forEach(set => sets.push(...set.adSets));
     const adsPromises = sets.map(async set => {
-      const ads = await facebookController.fetchFacebookAds(store, set.id, timeRange);
+      const ads = await facebookController.fetchFacebookAdsExpenses(store, set.id, timeRange);
       return ads;
     });
 
