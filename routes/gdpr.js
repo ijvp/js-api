@@ -2,10 +2,11 @@ const router = require('express').Router();
 const logger = require('../utils/logger');
 const redisClient = require('../clients').redisClient;
 const StoreController = require('../controllers/store');
+const { verifyWebhook } = require('../middleware/webhook');
 
 const storeController = new StoreController(redisClient);
 
-router.post('/gdpr/customer/data-request', (req, res) => {
+router.post('/gdpr/customer/data-request', verifyWebhook, (req, res) => {
 	const {
 		shop_id,
 		shop_domain,
@@ -25,7 +26,7 @@ router.post('/gdpr/customer/data-request', (req, res) => {
 	}
 });
 
-router.post('/gdpr/customer/redact', (req, res) => {
+router.post('/gdpr/customer/redact', verifyWebhook, (req, res) => {
 	const {
 		shop_id,
 		shop_domain,
@@ -43,7 +44,7 @@ router.post('/gdpr/customer/redact', (req, res) => {
 	}
 });
 
-router.post('/gdpr/shop/redact', async (req, res) => {
+router.post('/gdpr/shop/redact', verifyWebhook, async (req, res) => {
 	const {
 		shop_id,
 		shop_domain
