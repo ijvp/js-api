@@ -9,7 +9,7 @@ const http = require('http');
 const socket = require('./sockets');
 
 //modules
-const { redisStore } = require('./clients');
+const { redis } = require('./clients');
 
 // routes
 const authRoutes = require('./routes/auth');
@@ -40,7 +40,7 @@ if (process.env.NODE_ENV !== 'development') {
 
 // Redis session middleware
 app.use(session({
-	store: redisStore,
+	store: redis.redisStore,
 	secret: process.env.SESSION_SECRET,
 	resave: false,
 	saveUninitialized: false,
