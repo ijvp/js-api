@@ -38,6 +38,23 @@ jobs:
           docker tag ${{ env.AWS_ECR_REPO }}:${{ github.sha }} ${{ env.AWS_ECR_REPO }}:latest
           docker push ${{ env.AWS_ECR_REPO }}:latest
 
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region ${{ env.AWS_REGION }}
+      
+      - name: Login to ECR
+        run: aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ECR_REPO }}
+      
+      - name: Build and push Docker image
+        run: |
+          docker build -t ${{ env.AWS_ECR_REPO }}:${{ github.sha }} .
+          docker push ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
+
       - name: SSH into EC2 instance and deploy container
         uses: appleboy/ssh-action@master
         with:
@@ -52,12 +69,6 @@ jobs:
             fi
 
             sudo docker image prune -af
-
-            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws configure set region ${{ env.AWS_REGION }}
-
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ECR_REPO }}
 
             docker pull ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
 
