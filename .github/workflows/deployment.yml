@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  AWS_ECR_REPO: 548673342488.dkr.ecr.sa-east-1.amazonaws.com/dashboard-api
+  AWS_ECR_REPO: dashboard-api
   AWS_REGION: sa-east-1
 
 jobs:
