@@ -90,7 +90,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // App routes config
 app.get('/health', (req, res) => {
-	return res.status(200).send('ok');
+	return res.status(200).json({
+		"online": true
+	});
 })
 
 app.use('/', authRoutes);
