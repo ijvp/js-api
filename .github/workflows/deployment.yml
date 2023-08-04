@@ -50,8 +50,14 @@ jobs:
               sudo docker rm dashboard-javascript-api
             fi
 
+            sudo docker image prune -af
+
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set region ${{ env.AWS_REGION }}
+
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ECR_REPO }}
 
-            docker pull ${{ env.AWS_ECR_REPO }}:latest
+            docker pull ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
 
-            sudo docker run -d -p 8080:8080 --name dashboard-javascript-api --restart on-failure --env-file /home/ec2-user/js-api-env/.env --network dashboard-api-network ${{ env.AWS_ECR_REPO }}:latest
+            sudo docker run -d -p 8080:8080 --name dashboard-javascript-api --restart on-failure --env-file /home/ec2-user/js-api-env/.env --network dashboard-api-network ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
