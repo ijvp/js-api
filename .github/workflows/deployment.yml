@@ -6,8 +6,9 @@ on:
       - main
 
 env:
-  AWS_ECR_REPO: dashboard-api
   AWS_REGION: sa-east-1
+  AWS_ECR_REPO: 548673342488.dkr.ecr.sa-east-1.amazonaws.com/dashboard-api
+  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
 
 jobs:
   deploy:
@@ -22,20 +23,19 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-           
+          aws-region: sa-east-1
+          
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build, tag, and push Docker image to ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: ${{ env.AWS_ECR_REPO }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Build and push Docker image to ECR
         run: |
-          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          docker build -t ${{ env.AWS_ECR_REPO }} .
+          docker tag ${{ env.AWS_ECR_REPO }}:latest ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
+          docker push ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
+          docker tag ${{ env.AWS_ECR_REPO }}:${{ github.sha }} ${{ env.AWS_ECR_REPO }}:latest
+          docker push ${{ env.AWS_ECR_REPO }}:latest
 
       - name: SSH into EC2 instance and deploy container
         uses: appleboy/ssh-action@master
@@ -44,12 +44,19 @@ jobs:
           username: ${{ secrets.EC2_SSH_USERNAME }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
+            CONTAINER_NAME="dashboard-javascript-api"
             if [ "$(docker ps -aq -f name=dashboard-javascript-api)" ]; then
               sudo docker stop dashboard-javascript-api
               sudo docker rm dashboard-javascript-api
             fi
 
             sudo docker image prune -af
+
+            aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+            aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            aws configure set region ${{ env.AWS_REGION }}
+
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ECR_REPO }}
 
             docker pull ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
 
