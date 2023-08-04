@@ -6,9 +6,7 @@ on:
       - main
 
 env:
-  AWS_REGION: sa-east-1
   AWS_ECR_REPO: 548673342488.dkr.ecr.sa-east-1.amazonaws.com/dashboard-api
-  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
 
 jobs:
   deploy:
@@ -18,42 +16,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: sa-east-1
+          aws-region: ${{ env.AWS_REGION }}
            
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push Docker image to ECR
+      - name: Build, tag, and push Docker image to ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPORSITORY: ${{ env.AWS_ECR_REPO }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t ${{ env.AWS_ECR_REPO }} .
-          docker tag ${{ env.AWS_ECR_REPO }}:latest ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
-          docker push ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
-          docker tag ${{ env.AWS_ECR_REPO }}:${{ github.sha }} ${{ env.AWS_ECR_REPO }}:latest
-          docker push ${{ env.AWS_ECR_REPO }}:latest
-
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Configure AWS credentials
-        run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region ${{ env.AWS_REGION }}
-      
-      - name: Login to ECR
-        run: aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ECR_REPO }}
-      
-      - name: Build and push Docker image
-        run: |
-          docker build -t ${{ env.AWS_ECR_REPO }}:${{ github.sha }} .
-          docker push ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
 
       - name: SSH into EC2 instance and deploy container
         uses: appleboy/ssh-action@master
@@ -62,7 +43,6 @@ jobs:
           username: ${{ secrets.EC2_SSH_USERNAME }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
-            CONTAINER_NAME="dashboard-javascript-api"
             if [ "$(docker ps -aq -f name=dashboard-javascript-api)" ]; then
               sudo docker stop dashboard-javascript-api
               sudo docker rm dashboard-javascript-api
