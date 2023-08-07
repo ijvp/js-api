@@ -216,7 +216,7 @@ class GoogleController {
 			throw error;
 		}
 	};
-
+	
 	async fetchProductPageSessions(storeId, dateRange) {
 		try {
 			// 1.)	get analytics tokens
