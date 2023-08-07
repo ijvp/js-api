@@ -216,7 +216,7 @@ class GoogleController {
 			throw error;
 		}
 	};
-	
+
 	async fetchProductPageSessions(storeId, dateRange) {
 		try {
 			// 1.)	get analytics tokens
@@ -234,7 +234,7 @@ class GoogleController {
 
 			const { data: report } = await analytics.properties.runReport({
 				auth: authClient,
-				property: `properties/${id}`,
+				property: `properties/${id}`, 
 				requestBody: {
 					dimensions: [
 						{
