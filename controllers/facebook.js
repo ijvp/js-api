@@ -149,14 +149,10 @@ class FacebookController {
 				const parsedAdsExpenses = JSON.parse(cachedAdsExpenses);
 				const ttl = await this.redisClient.ttl(cacheKey);
 				logger.info(`Fetched Facebook Ads expenses '${storeId}:${timeRangeKey}' from cache. TTL: ${ttl}`);
-				return { adsMetrics: parsedAdsExpenses, ttl };
+				return { allAdsMetrics: parsedAdsExpenses, ttl };
 			}
 
-			let adsMetrics = {
-				id: '',
-				name: '',
-				metricsBreakdown: []
-			};
+			let allAdsMetrics = [];
 
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
 			const accountId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id');
@@ -172,31 +168,43 @@ class FacebookController {
 				fields: `id,name,creative,insights.fields(spend).level(account).time_range(${JSON.stringify(timeRange)})${insightsSegmentation}`,
 			};
 
-			const { data } = await axios.get(url, {
-				params
-			});
-			data.data.forEach(data => {
-				let indexHour;
-				data.insights?.data?.forEach(insight => {
-					if (isSingleDay) {
-						indexHour = insight.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
-					}
+			while (url) {
+				const { data: adsInsights } = await axios.get(url, {
+					params
+				});
 
-					let intervalData = {
-						date: isSingleDay ? `${insight.date_start}T${indexHour}` : `${insight.date_start}`,
-						metrics: {
-							spend: insight.spend || 0
+				adsInsights.data.forEach(data => {
+					let indexHour;
+					let adsMetrics = {
+						id: '',
+						name: '',
+						metricsBreakdown: []
+					};
+					data.insights?.data?.forEach(insight => {
+						if (data.id) {
+							if (isSingleDay) {
+								indexHour = insight.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
+							}
+							let intervalData = {
+								date: isSingleDay ? `${insight.date_start}T${indexHour}` : `${insight.date_start}`,
+								metrics: {
+									spend: insight.spend || 0
+								}
+							}
+							adsMetrics.id = data.id;
+							adsMetrics.name = data.name;
+							adsMetrics.metricsBreakdown.push(intervalData);
 						}
-					}
-					adsMetrics.id = data.id;
-					adsMetrics.name = data.name;
-					adsMetrics.metricsBreakdown.push(intervalData);
-				})
-			});
+					});
+					allAdsMetrics.push(adsMetrics);
+				});
 
-			await this.redisClient.set(cacheKey, JSON.stringify(adsMetrics), 'ex', cacheDuration);
+				url = adsInsights.paging.next;
+			}
+
+			await this.redisClient.set(cacheKey, JSON.stringify(allAdsMetrics), 'ex', cacheDuration);
 			logger.info(`Facebook Ads expenses for '${storeId}:${timeRangeKey}' cached. TTL: ${cacheDuration}`);
-			return { adsMetrics, ttl: cacheDuration };
+			return { allAdsMetrics, ttl: cacheDuration };
 		} catch (error) {
 			logger.error('Error retrieving Facebook Ads expenses: %s', error.response?.data?.error.message || error);
 			throw error;

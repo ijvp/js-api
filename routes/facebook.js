@@ -149,18 +149,20 @@ router.post("/facebook/ad-expenses", auth, storeExists, async (req, res) => {
   try {
     const adsMetrics = {};
     const timeRange = { since: start, until: end }
-    const adsExpenses = await facebookController.fetchFacebookAdsExpenses(store, timeRange);
+    const { allAdsMetrics: allAdsExpenses, ttl } = await facebookController.fetchFacebookAdsExpenses(store, timeRange);
 
-    adsExpenses.adsMetrics.metricsBreakdown.forEach(metricBreakdown => {
-      const { date, metrics } = metricBreakdown;
-      if (date in adsMetrics) {
-        adsMetrics[date].spend = parseFloat((adsMetrics[date].spend + parseFloat(metrics.spend)).toFixed(2));
-      } else {
-        adsMetrics[date] = { spend: parseFloat(metrics.spend) };
-      }
-    });
+    allAdsExpenses.forEach(adsExpenses => {
+      adsExpenses.metricsBreakdown.forEach(metricBreakdown => {
+        const { date, metrics } = metricBreakdown;
+        if (date in adsMetrics) {
+          adsMetrics[date].spend = parseFloat((adsMetrics[date].spend + parseFloat(metrics.spend)).toFixed(2));
+        } else {
+          adsMetrics[date] = { spend: parseFloat(metrics.spend) };
+        }
+      });
+    })
 
-    return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })), ttl: adsExpenses.ttl });
+    return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })), ttl });
   } catch (error) {
     return res.status(500).json({ success: false, error: "Internal server error" });
   }
