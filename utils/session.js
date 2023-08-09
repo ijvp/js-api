@@ -1,6 +1,8 @@
 const logIn = async (req, userId) => {
 	req.session.userId = userId;
-	req.session.save();
+	await req.session.save(err => {
+		if (err) throw err;
+	});
 };
 
 const logOut = (req, res) => {
