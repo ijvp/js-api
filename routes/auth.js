@@ -10,27 +10,32 @@ const StoreController = require('../controllers/store');
 const storeController = new StoreController(redis.redisClient);
 
 router.post('/auth/register', async (req, res) => {
-	const { username, password } = req.body;
-	const { guid } = req.query;
+	try {
+		const { username, password } = req.body;
+		const { guid } = req.query;
 
-	if (!(username && password)) {
-		return res.status(400).json({ success: false, message: 'Invalid request body' });
-	}
+		if (!(username && password)) {
+			return res.status(400).json({ success: false, message: 'Por favor preencha todos os campos' });
+		}
 
-	const found = await User.exists({ username });
-	if (found) {
-		res.status(409).json({ success: false, message: "A user with the given username is already registered" });
-	};
+		const found = await User.exists({ username });
+		if (found) {
+			return res.status(409).json({ success: false, message: 'Esse nome de usuário ja existe' });
+		};
 
-	const user = await User.create({ username, password: encrypt(password) });
+		const user = await User.create({ username, password: encrypt(password) });
 
-	if (guid) {
 		const storeId = decrypt(decodeURIComponent(guid));
-		await storeController.associateStoreWithUser(storeId, user.id);
-	};
+		if (storeId) {
+			await storeController.associateStoreWithUser(storeId, user.id);
+		};
 
-	logIn(req, user.id);
-	res.status(201).json({ success: true, message: `User '${user.username}' was created successfully` });
+		await logIn(req, user.id);
+		return res.status(201).json({ success: true, message: `User '${user.username}' was created successfully` });
+	} catch (error) {
+		logger.error(error);
+		return res.status(500).json({ success: false, message: 'Internal server error' });
+	}
 });
 
 router.post('/auth/login', async (req, res) => {

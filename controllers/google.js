@@ -205,7 +205,6 @@ class GoogleController {
 	async deleteGoogleAnalyticsProperty(storeId) {
 		try {
 			const numKeys = await this.redisClient.del(`google_analytics_property:${storeId}`);
-			console.log(numKeys);
 			if (numKeys) {
 				logger.info(`Google Analytics property hash '${storeId}' deleted`);
 				await this.revokeGoogleAnalyticsAccessFromStore(storeId);
@@ -235,7 +234,7 @@ class GoogleController {
 
 			const { data: report } = await analytics.properties.runReport({
 				auth: authClient,
-				property: `properties/${id}`,
+				property: `properties/${id}`,  
 				requestBody: {
 					dimensions: [
 						{

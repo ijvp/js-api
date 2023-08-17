@@ -100,28 +100,6 @@ router.get("/facebook/account/disconnect", auth, storeExists, async (req, res) =
   };
 });
 
-//Rota para buscar os gastos, e o roas de uma conta no facebook business
-// Tem que ser enviado o id da loja, a rota usa o access token do usuario a rota usa o access token do usuário ao id do das cotas administradas pelo usuário logado 
-// O startDate e o endDate tem que ser enviados no padrão yyyy-mm-dd
-// router.post("/facebook/ads", auth, storeExists, async (req, res) => {
-//   const { store, start, end } = req.body;
-
-//   if (!start && !end) {
-//     return res.status(400).json({ success: false, message: 'Invalid request body' });
-//   }
-
-//   try {
-//     const ads = await facebookController.fetchFacebookAds(store, start, end);
-//     return res.status(200).send({
-//       ...ads, metricsBreakdown: ads.metricsBreakdown.sort((a, b) => {
-//         return new Date(a.date) - new Date(b.date);
-//       })
-//     });
-//   } catch (error) {
-//     return res.status(500).json({ success: false, message: 'Internal server error' });
-//   };
-// });
-
 router.post("/facebook/campaigns", auth, storeExists, async (req, res) => {
   const { store } = req.body;
 
@@ -133,7 +111,6 @@ router.post("/facebook/campaigns", auth, storeExists, async (req, res) => {
     const campaigns = await facebookController.fetchActiveFacebookCampaigns(store);
     return res.json(campaigns);
   } catch (error) {
-    logger.error(error);
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
@@ -158,43 +135,35 @@ router.post("/facebook/ad-sets", auth, storeExists, async (req, res) => {
 
     return res.json(adSets);
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
 
-router.post("/facebook/ads", auth, storeExists, async (req, res) => {
-  const { store, start, end } = req.body;
+router.post("/facebook/ad-expenses", auth, storeExists, async (req, res) => {
+  const { store, start, end, granularity } = req.body;
 
   if (!store || !start || !end) {
     return res.status(400).json({ success: false, message: 'Invalid request body' });
   };
 
-
   try {
-    const ads = [];
-    const adSets = [];
+    const adsMetrics = {};
     const timeRange = { since: start, until: end }
-    const { data: campaigns } = await facebookController.fetchActiveFacebookCampaigns(store);
+    const { allAdsMetrics: allAdsExpenses, ttl } = await facebookController.fetchFacebookAdsExpenses(store, timeRange);
 
-    const adSetsPromises = campaigns.map(async campaign => {
-      const campaignAdSets = await facebookController.fetchFacebookCampaignAdSets(store, campaign.id);
-      return { campaignId: campaign.id, campaignName: campaign.name, adSets: campaignAdSets.data };
-    });
+    allAdsExpenses.forEach(adsExpenses => {
+      adsExpenses.metricsBreakdown.forEach(metricBreakdown => {
+        const { date, metrics } = metricBreakdown;
+        if (date in adsMetrics) {
+          adsMetrics[date].spend = parseFloat((adsMetrics[date].spend + parseFloat(metrics.spend)).toFixed(2));
+        } else {
+          adsMetrics[date] = { spend: parseFloat(metrics.spend) };
+        }
+      });
+    })
 
-    adSets.push(...await Promise.all(adSetsPromises));
-    const sets = [];
-    adSets.forEach(set => sets.push(...set.adSets));
-    const adsPromises = sets.map(async set => {
-      const ads = await facebookController.fetchFacebookAds(store, set.id, timeRange);
-      return { adSetId: set.id, adSetName: set.name, ads };
-    });
-
-    ads.push(...await Promise.all(adsPromises));
-
-    return res.json(ads);
+    return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })), ttl });
   } catch (error) {
-    logger.error(error);
     return res.status(500).json({ success: false, error: "Internal server error" });
   }
 });

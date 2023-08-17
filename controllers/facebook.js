@@ -69,7 +69,7 @@ class FacebookController {
 			);
 			return facebookAdsAccount;
 		} catch (error) {
-			logger.error('Error retrieving Facebook Ads Account: %s', error);
+			logger.error('Error retrieving Facebook Ads account: %s', error);
 			throw error;
 		};
 	};
@@ -95,68 +95,6 @@ class FacebookController {
 		}
 	};
 
-	// async fetchFacebookAds(storeId, start, end) {
-	// 	try {
-	// 		const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-	// 		const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
-	// 		const businessId = actId.slice(4) //remove 'act_';
-
-	// 		const campaign = {
-	// 			id: 'facebook-ads.ads-metrics',
-	// 			metricsBreakdown: []
-	// 		};
-
-	// 		const isSingleDay = differenceInDays(parseISO(String(end)), parseISO(String(start))) === 0;
-	// 		const since = start.split("T")[0];
-	// 		const until = end.split("T")[0];
-
-	// 		let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${actId}/insights`;
-	// 		let params = {
-	// 			time_range: { since, until },
-	// 			level: "account",
-	// 			fields: "campaign_name,adset_name,ad_name,spend,purchase_roas",
-	// 			access_token: facebookAccessToken
-	// 		};
-
-	// 		if (!isSingleDay) {
-	// 			params.time_increment = 1;
-	// 		} else {
-	// 			params.breakdowns = "hourly_stats_aggregated_by_advertiser_time_zone";
-	// 		};
-
-	// 		try {
-	// 			do {
-	// 				const response = await axios.get(url, { params: params });
-	// 				let resData = response.data.data;
-	// 				resData.forEach(data => {
-	// 					let indexHour;
-	// 					if (isSingleDay) {
-	// 						indexHour = data.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
-	// 					}
-
-	// 					const dailyDataDate = !isSingleDay ? `${data.date_start}` : `${data.date_start}T${indexHour}`;
-	// 					let dailyData = {
-	// 						date: dailyDataDate,
-	// 						metrics: {
-	// 							spend: parseFloat(data.spend),
-	// 						}
-	// 					}
-	// 					campaign.metricsBreakdown.push(dailyData);
-	// 				})
-	// 				url = response.data.paging?.next;
-	// 			} while (url);
-
-	// 			return campaign;
-	// 		} catch (error) {
-	// 			logger.error(error.response.data.error.message);
-	// 			throw error;
-	// 		}
-	// 	} catch (error) {
-	// 		logger.error(error);
-	// 		throw error;
-	// 	}
-	// };
-
 	async fetchActiveFacebookCampaigns(storeId) {
 		try {
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
@@ -174,7 +112,7 @@ class FacebookController {
 
 			return response.data;
 		} catch (error) {
-			logger.error(error);
+			logger.error('Error retrieving Facebook campaigns: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
@@ -195,23 +133,34 @@ class FacebookController {
 
 			return response.data;
 		} catch (error) {
-			logger.error(error);
+			logger.error('Error retrieving Facebook ad sets: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
 
-	async fetchFacebookAds(storeId, adSetId, timeRange) {
+	async fetchFacebookAdsExpenses(storeId, timeRange) {
 		try {
-			let adsMetrics = {
-				id: '',
-				name: '',
-				metricsBreakdown: []
-			};
+			const timeRangeKey = `${timeRange.since}__${timeRange.until}`;
+			const cacheKey = `facebook_ads_expenses:${storeId}:${timeRangeKey}`;
+			const cacheDuration = 600;
+
+			const cachedAdsExpenses = await this.redisClient.get(cacheKey);
+			if (cachedAdsExpenses) {
+				const parsedAdsExpenses = JSON.parse(cachedAdsExpenses);
+				const ttl = await this.redisClient.ttl(cacheKey);
+				logger.info(`Fetched Facebook Ads expenses '${storeId}:${timeRangeKey}' from cache. TTL: ${ttl}`);
+				return { allAdsMetrics: parsedAdsExpenses, ttl };
+			}
+
+			let allAdsMetrics = [];
 
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${adSetId}/ads`;
+			const accountId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id');
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${accountId}/ads`;
 
-			const isSingleDay = differenceInDays(new Date(timeRange.until), new Date(timeRange.since)) === 0;
+			const daysDiff = differenceInDays(new Date(timeRange.until), new Date(timeRange.since));
+			const isSingleDay = daysDiff === 0;
+
 			const insightsSegmentation = isSingleDay ? '.breakdowns(hourly_stats_aggregated_by_advertiser_time_zone)' : '.time_increment(1)'
 
 			let params = {
@@ -219,31 +168,45 @@ class FacebookController {
 				fields: `id,name,creative,insights.fields(spend).level(account).time_range(${JSON.stringify(timeRange)})${insightsSegmentation}`,
 			};
 
-			const { data } = await axios.get(url, {
-				params
-			});
-			data.data.forEach(data => {
-				let indexHour;
-				data.insights?.data?.forEach(insight => {
-					if (isSingleDay) {
-						indexHour = insight.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
-					}
+			while (url) {
+				const { data: adsInsights } = await axios.get(url, {
+					params
+				});
 
-					let intervalData = {
-						date: isSingleDay ? `${insight.date_start}T${indexHour}` : `${insight.date_start}`,
-						metrics: {
-							spend: insight.spend || 0
+				adsInsights.data.forEach(data => {
+					let indexHour;
+					let adsMetrics = {
+						id: '',
+						name: '',
+						metricsBreakdown: []
+					};
+					data.insights?.data?.forEach(insight => {
+						if (data.id) {
+							if (isSingleDay) {
+								indexHour = insight.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
+							}
+							let intervalData = {
+								date: isSingleDay ? `${insight.date_start}T${indexHour}` : `${insight.date_start}`,
+								metrics: {
+									spend: insight.spend || 0
+								}
+							}
+							adsMetrics.id = data.id;
+							adsMetrics.name = data.name;
+							adsMetrics.metricsBreakdown.push(intervalData);
 						}
-					}
-					adsMetrics.id = data.id;
-					adsMetrics.name = data.name;
-					adsMetrics.metricsBreakdown.push(intervalData);
-				})
-			});
+					});
+					allAdsMetrics.push(adsMetrics);
+				});
 
-			return adsMetrics;
+				url = adsInsights.paging.next;
+			}
+
+			await this.redisClient.set(cacheKey, JSON.stringify(allAdsMetrics), 'ex', cacheDuration);
+			logger.info(`Facebook Ads expenses for '${storeId}:${timeRangeKey}' cached. TTL: ${cacheDuration}`);
+			return { allAdsMetrics, ttl: cacheDuration };
 		} catch (error) {
-			logger.error(error);
+			logger.error('Error retrieving Facebook Ads expenses: %s', error.response?.data?.error.message || error);
 			throw error;
 		}
 	};
@@ -258,7 +221,7 @@ class FacebookController {
 			if (cachedAdsInsights) {
 				const parsedAdsInsights = JSON.parse(cachedAdsInsights);
 				const ttl = await this.redisClient.ttl(cacheKey);
-				logger.info(`Fetched Facebook Ads insights '${storeId}-${timeRangeKey}' from cache. TTL: ${ttl}`);
+				logger.info(`Fetched Facebook Ads insights '${storeId}:${timeRangeKey}' from cache. TTL: ${ttl}`);
 				return { adInsights: parsedAdsInsights, ttl };
 			}
 
@@ -311,7 +274,7 @@ class FacebookController {
 			})
 
 			await this.redisClient.set(cacheKey, JSON.stringify(adInsights), 'ex', cacheDuration);
-			logger.info(`Facebook Ads insights for '${storeId}-${timeRangeKey}' cached. TTL: ${cacheDuration}`);
+			logger.info(`Facebook Ads insights for '${storeId}:${timeRangeKey}' cached. TTL: ${cacheDuration}`);
 			return { adInsights, ttl: cacheDuration };
 		} catch (error) {
 			logger.error('Error retrieving Facebook Ads insights: %s', error.response?.data?.error.message || error);

@@ -7,8 +7,9 @@ const session = require('express-session');
 const passport = require('passport');
 const http = require('http');
 const socket = require('./sockets');
+
 //modules
-const { redisStore } = require('./clients');
+const { redis } = require('./clients');
 
 // routes
 const authRoutes = require('./routes/auth');
@@ -17,6 +18,9 @@ const googleRoutes = require('./routes/google');
 const facebookRoutes = require('./routes/facebook');
 const userRoutes = require('./routes/user');
 const gdprRoutes = require('./routes/gdpr');
+
+// middleware
+const { errorHandler } = require('./middleware/auth');
 
 // utils
 const connect = require('./utils/connect');
@@ -36,7 +40,7 @@ if (process.env.NODE_ENV !== 'development') {
 
 // Redis session middleware
 app.use(session({
-	store: redisStore,
+	store: redis.redisStore,
 	secret: process.env.SESSION_SECRET,
 	resave: false,
 	saveUninitialized: false,
@@ -86,7 +90,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // App routes config
 app.get('/health', (req, res) => {
-	return res.status(200).send('ok');
+	return res.status(200).json({
+		"online": true
+	});
 })
 
 app.use('/', authRoutes);
@@ -95,6 +101,8 @@ app.use('/', googleRoutes);
 app.use('/', facebookRoutes);
 app.use('/', userRoutes);
 app.use('/', gdprRoutes);
+
+app.use(errorHandler);
 
 server.listen(port, () => {
 	logger.info('NODE ENV: %s', process.env.NODE_ENV);
