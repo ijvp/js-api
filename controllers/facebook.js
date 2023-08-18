@@ -120,7 +120,6 @@ class FacebookController {
 	async fetchFacebookCampaignAdSets(storeId, campaignId) {
 		try {
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
 			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${campaignId}/adsets`;
 
 			const response = await axios.get(url, {
@@ -152,55 +151,55 @@ class FacebookController {
 				return { allAdsMetrics: parsedAdsExpenses, ttl };
 			}
 
-			let allAdsMetrics = [];
-
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
 			const accountId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id');
-			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${accountId}/ads`;
+			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${accountId}/insights`;
 
 			const daysDiff = differenceInDays(new Date(timeRange.until), new Date(timeRange.since));
 			const isSingleDay = daysDiff === 0;
 
-			const insightsSegmentation = isSingleDay ? '.breakdowns(hourly_stats_aggregated_by_advertiser_time_zone)' : '.time_increment(1)'
+			const segmentation = isSingleDay ? { breakdowns: 'hourly_stats_aggregated_by_advertiser_time_zone' } : { time_increment: 1 };
 
 			let params = {
 				access_token: facebookAccessToken,
-				fields: `id,name,creative,insights.fields(spend).level(account).time_range(${JSON.stringify(timeRange)})${insightsSegmentation}`,
+				fields: 'spend',
+				time_range: JSON.stringify(timeRange),
+				...segmentation,
+				limit: 250
 			};
+
+			let allAdsMetrics = [];
 
 			while (url) {
 				const { data: adsInsights } = await axios.get(url, {
 					params
 				});
 
-				adsInsights.data.forEach(data => {
+				adsInsights.data.forEach(insight => {
 					let indexHour;
 					let adsMetrics = {
 						id: '',
 						name: '',
 						metricsBreakdown: []
 					};
-					data.insights?.data?.forEach(insight => {
-						if (data.id) {
-							if (isSingleDay) {
-								indexHour = insight.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
-							}
-							let intervalData = {
-								date: isSingleDay ? `${insight.date_start}T${indexHour}` : `${insight.date_start}`,
-								metrics: {
-									spend: insight.spend || 0
-								}
-							}
-							adsMetrics.id = data.id;
-							adsMetrics.name = data.name;
-							adsMetrics.metricsBreakdown.push(intervalData);
+
+					if (isSingleDay) {
+						indexHour = insight.hourly_stats_aggregated_by_advertiser_time_zone.slice(0, 2);
+					}
+					let intervalData = {
+						date: isSingleDay ? `${insight.date_start}T${indexHour}` : `${insight.date_start}`,
+						metrics: {
+							spend: insight.spend || 0
 						}
-					});
+					}
+					adsMetrics.id = insight.id;
+					adsMetrics.name = insight.name;
+					adsMetrics.metricsBreakdown.push(intervalData);
 					allAdsMetrics.push(adsMetrics);
 				});
 
 				url = adsInsights.paging.next;
-			}
+			};
 
 			await this.redisClient.set(cacheKey, JSON.stringify(allAdsMetrics), 'ex', cacheDuration);
 			logger.info(`Facebook Ads expenses for '${storeId}:${timeRangeKey}' cached. TTL: ${cacheDuration}`);
@@ -235,7 +234,6 @@ class FacebookController {
 			const filters = [];
 			const limit = 250;
 			if (adNameQuery) filters.push({ 'field': 'ad.name', 'operator': 'CONTAIN', 'value': adNameQuery });
-
 
 			const response = await axios.get(url, {
 				params: {

@@ -39,6 +39,19 @@ const getStoreFrontApiURL = (store) => {
 	return `https://${store}/api/${process.env.SHOPIFY_API_VERSION}`;
 };
 
+// passar propriedade "timezone" do recurso "shop"
+// exemplo: "(GMT-03:00) America/Sao_Paulo"
+// https://shopify.dev/docs/api/admin-rest/2023-07/resources/shop
+const extractTimezoneOffset = (timezoneString) => {
+	const offsetPattern = /([+-]\d{2}:\d{2})/;
+	const match = timezoneString.match(offsetPattern);
+	if (match) {
+		return match[1];
+	} else {
+		return "Unknown";
+	}
+};
+
 //sempre retorna a proxima pagina do header da shopify, se nao retorna nulo
 //é possivel que precise refatorar isso depois caso rel="previous" torne se
 //util
@@ -80,5 +93,6 @@ module.exports = {
 	getStoreFrontApiURL,
 	getStoreApiURL,
 	extractHttpsUrl,
+	extractTimezoneOffset,
 	getSessionFromStorage
 };

@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const { getStoreApiURL, extractHttpsUrl } = require('../utils/shop');
+const { getStoreApiURL, extractHttpsUrl, extractTimezoneOffset } = require('../utils/shop');
 const axios = require('axios');
 const GoogleController = require('./google');
 const FacebookController = require('./facebook');
@@ -56,7 +56,12 @@ class StoreController {
 
 	async createStore(store) {
 		try {
-			await this.redisClient.hset(`store:${store.name}`, store);
+			const { data } = await axios.get(`${getStoreApiURL(store.name)}/shop.json`, {
+				headers: {
+					'X-Shopify-Access-Token': store.shopifyAccessToken
+				}
+			});
+			await this.redisClient.hset(`store:${store.name}`, { ...store, ...data.shop });
 			logger.info(`Store '${store.name}' hash persisted`);
 		} catch (error) {
 			logger.error(error);
@@ -86,17 +91,20 @@ class StoreController {
 
 	async fetchStoreOrders(storeId, start, end) {
 		try {
-			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
 			const allOrders = [];
+
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken')
+			const timezoneOffset = extractTimezoneOffset(await this.redisClient.hget(`store:${storeId}`, 'timezone'));
+
 			let ordersEndpoint = `${getStoreApiURL(storeId)}/orders.json`;
 			let params = {
-				//TODO: remover essa gambiarra?
-				created_at_min: start + 'T00:00:00:000',
-				created_at_max: end + 'T23:59:59:999',
+				created_at_min: start + 'T00:00:00' + timezoneOffset,
+				created_at_max: end + 'T23:59:59' + timezoneOffset,
 				financial_status: 'paid',
 				status: 'any',
 				limit: 250
-			}
+			};
+
 			while (ordersEndpoint) {
 				const response = await axios.get(ordersEndpoint, {
 					params,
