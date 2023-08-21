@@ -62,11 +62,14 @@ const extractHttpsUrl = (linkHeader) => {
 		for (const link of links) {
 			let [url, rel] = link.split(';');
 
-			rel = rel.match(/rel="(.*)"/)[1];
-
-			if (rel == "next") {
-				url = url.trim().slice(1, -1);
-				return url;
+			if (rel) {
+				rel = rel.match(/rel="(.*)"/)[1];
+				if (rel == "next") {
+					url = url.trim().slice(1, -1);
+					return url;
+				}
+			} else {
+				return false;
 			}
 		}
 	}
