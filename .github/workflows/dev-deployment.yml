@@ -1,9 +1,9 @@
-name: Deploy dashboard javascript to ECR and EC2
+name: Deploy dashboard js api to ECR and EC2 (DEV)
 
 on:
   push:
-    branches: 
-      - main
+    branches:
+      - development
 
 env:
   AWS_REGION: sa-east-1
@@ -14,7 +14,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    steps:        
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
@@ -24,7 +24,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: sa-east-1
-          
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
@@ -40,9 +40,9 @@ jobs:
       - name: SSH into EC2 instance and deploy container
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_SSH_HOST }}
+          host: ${{ secrets.EC2_DEV_SSH_HOST }}
           username: ${{ secrets.EC2_SSH_USERNAME }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          key: ${{ secrets.EC2_DEV_SSH_PRIVATE_KEY }}
           script: |
             CONTAINER_NAME="dashboard-javascript-api"
             if [ "$(docker ps -aq -f name=dashboard-javascript-api)" ]; then

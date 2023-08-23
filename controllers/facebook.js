@@ -120,7 +120,6 @@ class FacebookController {
 	async fetchFacebookCampaignAdSets(storeId, campaignId) {
 		try {
 			const facebookAccessToken = await this.redisClient.hget(`store:${storeId}`, 'facebookAccessToken');
-			const actId = await this.redisClient.hget(`facebook_ads_account:${storeId}`, 'id')
 			let url = `https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/${campaignId}/adsets`;
 
 			const response = await axios.get(url, {
@@ -235,7 +234,6 @@ class FacebookController {
 			const filters = [];
 			const limit = 250;
 			if (adNameQuery) filters.push({ 'field': 'ad.name', 'operator': 'CONTAIN', 'value': adNameQuery });
-
 
 			const response = await axios.get(url, {
 				params: {

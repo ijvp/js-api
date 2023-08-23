@@ -57,11 +57,20 @@ const extractTimezoneOffset = (timezoneString) => {
 //util
 const extractHttpsUrl = (linkHeader) => {
 	if (linkHeader) {
-		const links = linkHeader.split(' ');
-		const url = links[0].slice(1, -2);
-		const rel = links[1].match(/rel="(.*)"/)[1];
-		if (url && rel === "next") {
-			return url;
+		const links = linkHeader.split(',');
+
+		for (const link of links) {
+			let [url, rel] = link.split(';');
+
+			if (rel) {
+				rel = rel.match(/rel="(.*)"/)[1];
+				if (rel == "next") {
+					url = url.trim().slice(1, -1);
+					return url;
+				}
+			} else {
+				return false;
+			}
 		}
 	}
 
