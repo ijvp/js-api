@@ -50,8 +50,6 @@ jobs:
               sudo docker rm dashboard-javascript-api
             fi
 
-            sudo usermod -aG docker $USER
-
             sudo docker image prune -af
 
             aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
