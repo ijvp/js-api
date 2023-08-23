@@ -44,7 +44,6 @@ jobs:
           username: ${{ secrets.EC2_SSH_USERNAME }}
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
-            CONTAINER_NAME="dashboard-javascript-api"
             if [ "$(docker ps -aq -f name=dashboard-javascript-api)" ]; then
               sudo docker stop dashboard-javascript-api
               sudo docker rm dashboard-javascript-api
