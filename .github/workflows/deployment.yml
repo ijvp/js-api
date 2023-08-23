@@ -37,9 +37,6 @@ jobs:
           docker tag ${{ env.AWS_ECR_REPO }}:${{ github.sha }} ${{ env.AWS_ECR_REPO }}:latest
           docker push ${{ env.AWS_ECR_REPO }}:latest
 
-      - name: Add runner to docker group
-        run: sudo usermod -aG docker $USER
-
       - name: SSH into EC2 instance and deploy container
         uses: appleboy/ssh-action@master
         with:
@@ -52,6 +49,8 @@ jobs:
               sudo docker stop dashboard-javascript-api
               sudo docker rm dashboard-javascript-api
             fi
+
+            sudo usermod -aG docker $USER
 
             sudo docker image prune -af
 
