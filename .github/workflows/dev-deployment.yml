@@ -52,7 +52,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_DEV_SSH_HOST }}
           username: ${{ secrets.EC2_SSH_USERNAME }}
-          key: ${{ env.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.EC2_DEV_SSH_PRIVATE_KEY }}
           script: |
             CONTAINER_NAME="dashboard-javascript-api"
             if [ "$(docker ps -aq -f name=dashboard-javascript-api)" ]; then
