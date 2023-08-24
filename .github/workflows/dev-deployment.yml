@@ -8,7 +8,7 @@ on:
 env:
   AWS_REGION: sa-east-1
   AWS_ECR_REPO: 548673342488.dkr.ecr.sa-east-1.amazonaws.com/dashboard-api-dev
-  SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+  SSH_PRIVATE_KEY: ${{ secrets.EC2_DEV_SSH_PRIVATE_KEY }}
 
 jobs:
   deploy:
