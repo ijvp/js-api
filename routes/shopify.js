@@ -119,9 +119,9 @@ router.get('/shopify/products', auth, storeExists, async (req, res) => {
 });
 
 router.get('/shopify/product', auth, async (req, res) => {
-	const { store, productId } = req.body;
+	const { store, productId } = req.query;
 	if (!store || !productId) {
-		return res.status(400).json({ success: false, message: 'Invalid request body, missing product id' })
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
 	try {
@@ -187,7 +187,8 @@ router.post('/shopify/webhooks/products-bulk-read', async (req, res) => {
 		let products = await storeController.readProductVariantsFromJSONL(storeId, admin_graphql_api_id);
 		products = products.map(product => {
 			let productJSON = JSON.parse(product);
-			return [productJSON.id, product];
+			const productId = String(productJSON.id).split("/").slice(-1)[0]
+			return [productId, product];
 		});
 
 		await storeController.createAllProducts(storeId, products);

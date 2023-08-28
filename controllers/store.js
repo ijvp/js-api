@@ -332,6 +332,8 @@ class StoreController {
 		try {
 			await this.redisClient.del(`facebook_ads_account:${storeId}`);
 			await this.redisClient.del(`google_ads_account:${storeId}`);
+			await this.redisClient.del(`google_analytics_property:${storeId}`);
+			await this.redisClient.del(`products:${storeId}`);
 			await this.redisClient.del(`store:${storeId}`);
 			userId && await this.redisClient.srem(`user_stores:${userId}`, storeId);
 		} catch (error) {
@@ -354,7 +356,8 @@ class StoreController {
 	async createProduct(storeId, product) {
 		try {
 			const redisKey = `products:${storeId}`;
-			await this.redisClient.hset(redisKey, product.id, JSON.stringify(product));
+			const productId = String(product.id).split("/").slice(-1)[0];
+			await this.redisClient.hset(redisKey, productId, JSON.stringify(product));
 			logger.info(`Created product ${product.id} in store ${storeId}`);
 		} catch (error) {
 			logger.error(`Failed to create product for store '${storeId}': %s`, error);

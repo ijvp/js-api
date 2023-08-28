@@ -9,7 +9,14 @@ const storeController = new StoreController(redisClient);
 
 router.get('/user/stores', auth, async (req, res) => {
 	try {
-		const stores = await storeController.getStoresByUserId(req.session.userId);
+		const stores = [];
+		const storeIds = await storeController.getStoresByUserId(req.session.userId);
+		const storesPromises = storeIds.map(async storeId => {
+			const store = await redisClient.hgetall(`store:${storeId}`);
+			return store;
+		});
+
+		stores.push(... await Promise.all(storesPromises));
 		return res.json(stores);
 	} catch (error) {
 		return res.status(500).json({ success: false, error: "Internal Server Error" });
