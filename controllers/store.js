@@ -9,6 +9,7 @@ const fs = require('fs');
 class StoreController {
 	constructor(redisClient) {
 		this.redisClient = redisClient;
+		this.webhookUrl = process.env.NODE_ENV === "development" ? process.env.TUNNEL_URL : process.env.URL
 	};
 
 	async getStoresByUserId(userId) {
@@ -159,15 +160,13 @@ class StoreController {
 		}
 	};
 
-	// TODO: refactor
 	// very expensive query! https://shopify.dev/docs/api/usage/bulk-operations/queries
-	async submitBulkProductsQuery(storeId) {
+	async submitBulkProductVariantsQuery(storeId) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
 
-			let graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
-
-			let bulkOperationQuery = `
+			const bulkOperationQuery = `
 			mutation {
 				bulkOperationRunQuery(
 				 query: """
@@ -212,27 +211,7 @@ class StoreController {
 			}
 			`;
 
-			let webhookSubscriptionQuery = `
-				mutation {
-					webhookSubscriptionCreate(
-						topic: BULK_OPERATIONS_FINISH
-						webhookSubscription: {
-							format: JSON,
-							callbackUrl: "https://7b43-2804-d45-9682-e500-8955-f92d-f2cc-3af6.ngrok-free.app/shopify/products-bulk-read"
-						}
-					) {
-						userErrors {
-							field
-							message
-						}
-						webhookSubscription {
-							id
-						}
-					}
-				}
-			`;
-
-			const bulkOperationResponse = await axios.post(graphqlEndpoint,
+			await axios.post(graphqlEndpoint,
 				{
 					query: bulkOperationQuery
 				},
@@ -241,26 +220,17 @@ class StoreController {
 						'Content-Type': 'application/json',
 						'X-Shopify-Access-Token': accessToken
 					}
-				});
-
-			const webhookSubscriptionResponse = await axios.post(graphqlEndpoint,
-				{
-					query: webhookSubscriptionQuery
-				},
-				{
-					headers: {
-						'Content-Type': 'application/json',
-						'X-Shopify-Access-Token': accessToken
-					}
 				}
 			);
+
+			logger.info(`Submitted bulk product variants query for store '${storeId}'`);
 		} catch (error) {
 			logger.error('Failed to submit bulk products query\n%s', error);
 			throw error;
 		};
 	};
 
-	async fetchBulkProductsQueryJSONL(storeId, graphqlApiId) {
+	async readProductVariantsFromJSONL(storeId, graphqlApiId) {
 		try {
 			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
 			const graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
@@ -287,6 +257,7 @@ class StoreController {
 			});
 
 			const { url } = bulkOperationUrlResponse.data.data.node;
+
 			const productsJSONLResponse = await axios.get(url, {
 				responseType: 'stream'
 			});
@@ -304,28 +275,6 @@ class StoreController {
 			logger.error('Failed to fetch products\n%s', error);
 			throw error;
 		};
-	};
-
-	async saveStoreProducts(storeId, products) {
-		try {
-			await this.redisClient.sadd(`products:${storeId}`, products);
-			logger.info(`%i products associated with store '${storeId}'`, products.length);
-		} catch (error) {
-			logger.error(`Failed to save products for store '${storeId}': %s`, error);
-			throw error;
-		}
-	};
-
-	async readStoreProducts(storeId) {
-		try {
-			const products = [];
-			const productMembers = await this.redisClient.smembers(`products:${storeId}`);
-			productMembers.forEach(member => products.push(JSON.parse(member)));
-			return products;
-		} catch (error) {
-			logger.error(`Failed to read products for store '${storeId}': %s`, error);
-			throw error;
-		}
 	};
 
 	async fetchStoreProductOrders(storeId, start, end) {
@@ -379,17 +328,6 @@ class StoreController {
 		return product;
 	};
 
-	async fetchStoreProduct(storeId, productId) {
-		try {
-			const products = await this.readStoreProducts(storeId);
-			const product = products.find(product => product.id === productId);
-			return product;
-		} catch (error) {
-			logger.error(`Failed to read product '${productId}' for store '${storeId}': %s`, error);
-			throw error;
-		}
-	};
-
 	async deleteStoreData(storeId, userId) {
 		try {
 			await this.redisClient.del(`facebook_ads_account:${storeId}`);
@@ -400,6 +338,216 @@ class StoreController {
 			logger.error(`Failed to delete data for store '${storeId}': %s`, error);
 			throw error;
 		}
+	};
+
+	async createAllProducts(storeId, products) {
+		try {
+			const redisKey = `products:${storeId}`;
+			await this.redisClient.hmset(redisKey, ...products);
+			logger.info(`Created ${products.length} products in store ${storeId}`);
+		} catch (error) {
+			logger.error(`Failed to create initial products for store '${storeId}': %s`, error);
+			throw error;
+		}
+	}
+
+	async createProduct(storeId, product) {
+		try {
+			const redisKey = `products:${storeId}`;
+			await this.redisClient.hset(redisKey, product.id, JSON.stringify(product));
+			logger.info(`Created product ${product.id} in store ${storeId}`);
+		} catch (error) {
+			logger.error(`Failed to create product for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async getProduct(storeId, productId) {
+		try {
+			const redisKey = `products:${storeId}`;
+			const productData = await this.redisClient.hget(redisKey, productId);
+			return productData ? JSON.parse(productData) : null;
+		} catch (error) {
+			logger.error(`Failed to get product '${productId}' for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async updateProduct(storeId, product) {
+		try {
+			const redisKey = `products:${storeId}`;
+			await this.redisClient.hset(redisKey, product.id, JSON.stringify(product));
+			logger.info(`Updated product ${product.id} in store ${storeId}`);
+		} catch (error) {
+			logger.error(`Failed to update single product for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async deleteProduct(storeId, productId) {
+		try {
+			const redisKey = `products:${storeId}`;
+			await this.redisClient.hdel(redisKey, productId);
+			logger.info(`Deleted product ${productId} in store ${storeId}`);
+		} catch (error) {
+			logger.error(`Failed to delete product '${productId}' for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async getAllProducts(storeId) {
+		try {
+			const redisKey = `products:${storeId}`;
+			const productHash = await this.redisClient.hgetall(redisKey);
+			return Object.values(productHash).map(JSON.parse);
+		} catch (error) {
+			logger.error(`Failed to get all products for store '${storeId}': %s`, error);
+			throw error;
+		}
+	};
+
+	async subscribeToBulkOperationsWebhook(storeId) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+
+			let webhookSubscriptionQuery = `
+			mutation {
+				webhookSubscriptionCreate(
+					topic: BULK_OPERATIONS_FINISH
+					webhookSubscription: {
+						format: JSON,
+						callbackUrl: "${this.webhookUrl}/shopify/webhooks/products-bulk-read"
+					}
+				) {
+					userErrors {
+						field
+						message
+					}
+					webhookSubscription {
+						id
+					}
+				}
+			}
+		`;
+
+			const response = await axios.post(graphqlEndpoint,
+				{
+					query: webhookSubscriptionQuery
+				},
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Access-Token': accessToken
+					}
+				}
+			);
+
+			if (!!response.data?.data?.webhookSubscriptionCreate?.userErrors?.length) {
+				throw response.data.data.webhookSubscriptionCreate.userErrors[0].message;
+			};
+
+			logger.info(`Subscribed to Shopify webhook topic 'bulk_operations/finish' for store '${storeId}'`);
+		} catch (error) {
+			logger.error("Failed to subscribe to Shopify webhook topic 'bulk_operations/finish': %s", error);
+			throw error;
+		}
+	};
+
+	async subscribeToStoreProductsWebhooks(storeId) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+
+			const webhookSubscriptionQuery = `			
+			mutation SubscribeToProductWebhooks {
+				createProductSubscription: webhookSubscriptionCreate(
+					topic: PRODUCTS_CREATE
+					webhookSubscription: {
+						format: JSON,
+						callbackUrl: "${this.webhookUrl}/shopify/webhooks/product"
+					}
+				) {
+					userErrors {
+						field
+						message
+					}
+					webhookSubscription {
+						id
+					}
+				}
+		
+				deleteProductSubscription: webhookSubscriptionCreate(
+					topic: PRODUCTS_DELETE
+					webhookSubscription: {
+						format: JSON,
+						callbackUrl: "${this.webhookUrl}/shopify/webhooks/product"
+					}
+				) {
+					userErrors {
+						field
+						message
+					}
+					webhookSubscription {
+						id
+					}
+				}
+		
+				updateProductSubscription: webhookSubscriptionCreate(
+					topic: PRODUCTS_UPDATE
+					webhookSubscription: {
+						format: JSON,
+						callbackUrl: "${this.webhookUrl}/shopify/webhooks/product"
+					}
+				) {
+					userErrors {
+						field
+						message
+					}
+					webhookSubscription {
+						id
+					}
+				}
+			}
+		`;
+
+
+			const response = await axios.post(graphqlEndpoint,
+				{
+					query: webhookSubscriptionQuery
+				},
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Access-Token': accessToken
+					}
+				}
+			);
+
+			if (!!response.data?.errors?.length) {
+				throw response.data.errors[0].message;
+			};
+
+			logger.info(`Subscribed to Shopify webhook topics ['products/create', 'products/delete', 'products/update'] for store '${storeId}'`)
+		} catch (error) {
+			logger.error("Failed to subscribe to Shopify webhook topics ['products/create', 'products/delete', 'products/update']: %s", error);
+			throw error;
+		}
+	};
+
+	async configureStoreWebhookSubscriptions(storeId) {
+		try {
+			await this.subscribeToBulkOperationsWebhook(storeId);
+			await this.subscribeToStoreProductsWebhooks(storeId);
+
+			logger.info(`Configured Shopify webhooks for store '${storeId}'`);
+		} catch (error) {
+			logger.error("Failed to configure store webhook subscriptions");
+		}
+	};
+
+	async destroyStoreWebhookSubscriptions(storeId) {
+		//TODO:
 	}
 };
 
