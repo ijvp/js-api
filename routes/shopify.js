@@ -187,7 +187,7 @@ router.post('/shopify/webhooks/products-bulk-read', async (req, res) => {
 		let products = await storeController.readProductVariantsFromJSONL(storeId, admin_graphql_api_id);
 		products = products.map(product => {
 			let productJSON = JSON.parse(product);
-			const productId = String(productJSON.id).split("/").slice(-1)[0]
+			const productId = Number(String(productJSON.id).split("/").slice(-1)[0]);
 			return [productId, product];
 		});
 
@@ -223,7 +223,14 @@ router.post('/shopify/webhooks/product', async (req, res) => {
 				break;
 
 			case 'products/update':
-				await storeController.updateProduct(storeId, productData);
+				const products = await storeController.getAllProducts(storeId);
+				const outdatedProduct = products.find(product => {
+					const parsedProductId = Number(String(product.id).split("/").slice(-1)[0]);
+					return parsedProductId === productData.id;
+				});
+
+				const updatedProduct = await storeController.fetchProduct(storeId, outdatedProduct.id);
+				await storeController.updateProduct(storeId, updatedProduct);
 				break;
 
 			case 'products/delete':

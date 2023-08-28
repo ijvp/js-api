@@ -177,6 +177,7 @@ class StoreController {
 									id
 									handle
 									title
+									description
 									priceRangeV2 {
 										maxVariantPrice {
 											amount
@@ -365,6 +366,57 @@ class StoreController {
 		}
 	};
 
+	async fetchProduct(storeId, productId) {
+		try {
+			const accessToken = await this.redisClient.hget(`store:${storeId}`, 'shopifyAccessToken');
+			const graphqlEndpoint = `${getStoreApiURL(storeId)}/graphql.json`;
+
+			const productQuery = `
+				query getProductById($id: ID!) {
+					product(id: $id) {
+						id
+						handle
+						title
+						description
+						priceRangeV2 {
+							maxVariantPrice {
+								amount
+								currencyCode
+							}
+							minVariantPrice {
+								amount
+								currencyCode
+							}
+						}
+						featuredImage {
+							altText
+							height
+							url
+							width
+						}
+					}
+				}
+			`
+
+			const response = await axios.post(graphqlEndpoint,
+				{
+					query: productQuery,
+					variables: { id: productId }
+				},
+				{
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Shopify-Access-Token': accessToken
+					}
+				});
+
+			return response.data.data.product;
+		} catch (error) {
+			logger.error(`Failed to fetch product '${productId}' query\n%s`, error);
+			throw error;
+		}
+	};
+
 	async getProduct(storeId, productId) {
 		try {
 			const redisKey = `products:${storeId}`;
@@ -379,7 +431,8 @@ class StoreController {
 	async updateProduct(storeId, product) {
 		try {
 			const redisKey = `products:${storeId}`;
-			await this.redisClient.hset(redisKey, product.id, JSON.stringify(product));
+			const productId = Number(String(product.id).split("/").slice(-1)[0]);
+			await this.redisClient.hset(redisKey, productId, JSON.stringify(product));
 			logger.info(`Updated product ${product.id} in store ${storeId}`);
 		} catch (error) {
 			logger.error(`Failed to update single product for store '${storeId}': %s`, error);
