@@ -1,6 +1,7 @@
 const { GoogleAdsApi } = require('google-ads-api');
 const { google } = require('googleapis');
 const logger = require('../utils/logger');
+const { formatGoogleDateRange } = require('../utils/date');
 
 const googleAds = new GoogleAdsApi({
 	client_id: `${process.env.GOOGLE_CLIENT_ID}`,
@@ -217,8 +218,20 @@ class GoogleController {
 		}
 	};
 
-	async fetchProductPageSessions(storeId, dateRange) {
+	async fetchProductPageSessions(storeId, dates) {
 		try {
+			const dateRangeKey = `${dates.start}__${dates.end}`;
+			const cacheKey = `product_page_sessions:${storeId}:${dateRangeKey}`;
+			const cacheDuration = 300;
+
+			const cachedSessions = await this.redisClient.get(cacheKey);
+			if (cachedSessions) {
+				const parsedSessions = JSON.parse(cachedSessions);
+				const ttl = await this.redisClient.ttl(cacheKey);
+				logger.info(`Fetched product page sessions '${storeId}:${dateRangeKey}' from cache. TTL: ${ttl}`);
+				return { sessions: parsedSessions, ttl };
+			}
+
 			// 1.)	get analytics tokens
 			// 2.)	get google_analytics_account hash -> ga4 propertyId
 			// 3.)	call analytics library runReport function with propertyId
@@ -227,14 +240,14 @@ class GoogleController {
 			const tokens = await this.redisClient.hmget(`store:${storeId}`, 'googleAnalyticsAccessToken', 'googleAnalyticsRefreshToken');
 			const authClient = new google.auth.OAuth2(`${process.env.GOOGLE_CLIENT_ID}`, `${process.env.GOOGLE_CLIENT_SECRET}`);
 			authClient.setCredentials({ access_token: tokens[0], refresh_token: tokens[1] });
-
+			const dateRange = formatGoogleDateRange(dates.start, dates.end);
 			const analytics = google.analyticsdata('v1beta')
 			const { id } = await this.getGoogleAnalyticsPropertyByStoreId(storeId);
 			// query built using https://ga-dev-tools.google/ga4/query-explorer/
 
 			const { data: report } = await analytics.properties.runReport({
 				auth: authClient,
-				property: `properties/${id}`,  
+				property: `properties/${id}`,
 				requestBody: {
 					dimensions: [
 						{
@@ -260,7 +273,16 @@ class GoogleController {
 					],
 				}
 			});
-			return report;
+
+
+			const sessionsData = report.rows.map(row => ({
+				pagePath: row.dimensionValues[0].value,
+				sessions: row.metricValues[0].value
+			}));
+
+			await this.redisClient.set(cacheKey, JSON.stringify(sessionsData), 'ex', cacheDuration);
+			logger.info(`Product page sessions for '${storeId}:${dateRangeKey}' cached. TTL: ${cacheDuration}`);
+			return { sessions: sessionsData, ttl: cacheDuration };
 		} catch (error) {
 			logger.error(error);
 			throw error;

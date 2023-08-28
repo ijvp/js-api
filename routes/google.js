@@ -5,6 +5,7 @@ const { auth } = require('../middleware/auth');
 const { google } = require('googleapis');
 const { redis } = require('../clients');
 const GoogleController = require('../controllers/google');
+const StoreController = require('../controllers/store');
 const axios = require('axios');
 const { differenceInDays, endOfToday, startOfToday } = require('date-fns');
 const { getTimePeriodString } = require('../utils/google')
@@ -14,6 +15,7 @@ const { redisClient } = redis;
 const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URL, TOKEN_GOOGLE } = process.env;
 
 const googleController = new GoogleController(redisClient);
+const storeController = new StoreController(redisClient);
 
 let oauth2Client;
 
@@ -213,14 +215,34 @@ router.get('/google-analytics/accounts', auth, storeExists, async (req, res) => 
 router.get('/google-analytics/product-sessions', auth, storeExists, async (req, res) => {
   try {
     const { store, start, end } = req.query;
-    const dateRange = formatGoogleDateRange(start, end);
-    const productPageSessions = await googleController.fetchProductPageSessions(store, dateRange);
-    res.status(200).json(productPageSessions);
+    const dates = { start, end };
+    const productPagesSessions = await googleController.fetchProductPageSessions(store, dates);
+    res.status(200).json(productPagesSessions);
   } catch (error) {
+    logger.error("Failed to fetch product sessions %s", error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
+router.get('/google-analytics/product-sessions/:productId', auth, storeExists, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { store, start, end } = req.query;
+    const dates = { start, end };
+
+    const product = await storeController.getProduct(store, productId);
+    const pagesSessions = await googleController.fetchProductPageSessions(store, dates);
+
+    const productPageSessions = pagesSessions.sessions.find(pageSessions => {
+      return pageSessions.pagePath.split("/").slice(-1)[0] === product.handle;
+    });
+
+    return res.json(productPageSessions);
+  } catch (error) {
+    logger.error(`Failed to fetch product sessions for product ${req.params.productId} %s`, error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+})
 router.get('/date-range', (req, res) => {
   const { start, end } = req.query;
 

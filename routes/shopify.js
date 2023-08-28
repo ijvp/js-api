@@ -138,18 +138,14 @@ router.get('/shopify/product', auth, async (req, res) => {
 
 router.post('/shopify/product-orders', auth, storeExists, async (req, res) => {
 	const { store, productId, start, end } = req.body;
-	if (!store) {
-		return res.status(400).json({ success: false, message: 'Invalid request body, missing store' })
+
+	if (!store || !productId || !start || !end) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
 	try {
 		let orderData;
-		if (productId) {
-			//TODO: return sales data for a single product
-			orderData = await storeController.fetchStoreProductOrdersByProductId(store, productId, start, end);
-		} else {
-			orderData = await storeController.fetchStoreProductOrders(store, start, end);
-		};
+		orderData = await storeController.fetchOrdersByProductId(store, productId, start, end);
 		return res.json(orderData);
 	} catch (error) {
 		logger.error(error);
