@@ -14,7 +14,6 @@ router.get('/user/stores', auth, async (req, res) => {
 		const storeIds = await storeController.getStoresByUserId(req.session.userId);
 		const storesPromises = storeIds.map(async storeId => {
 			const store = await redisClient.hgetall(`store:${storeId}`);
-			logger.info(store)
 			return store;
 		});
 
