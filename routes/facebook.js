@@ -12,9 +12,11 @@ const facebookController = new FacebookController(redisClient);
 //Login facebook, quando usuário finalizar login chama a rota callback
 router.get("/facebook/authorize", auth, async (req, res) => {
   const { store } = req.query;
+
   if (!store) {
     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
-  }
+  };
+
   return res.status(200).json(`https://www.facebook.com/${process.env.FACEBOOK_API_VERSION}/dialog/oauth?client_id=${process.env.FACEBOOK_API_CLIENT_ID}&redirect_uri=${process.env.FACEBOOK_API_REDIRECT_URL}&scope=${process.env.FACEBOOK_API_SCOPES}&state=${store}`)
 });
 

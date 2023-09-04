@@ -19,7 +19,10 @@ const formatGoogleDateRange = (start, end) => {
 	}
 
 	if (endDate.getTime() === yesterday.getTime()) {
-		return `${differenceInDays(endDate, startDate)}daysAgo`;
+		return {
+			startDate: `${differenceInDays(today, startDate)}daysAgo`,
+			endDate: `${differenceInDays(today, endDate)}daysAgo`
+		};
 	}
 
 	return { startDate: start, endDate: end }

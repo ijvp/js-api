@@ -7,13 +7,13 @@ const { shopify, redis } = require('../clients');
 const { encrypt } = require('../utils/crypto');
 const { getStoreApiURL } = require('../utils/shop');
 const StoreController = require('../controllers/store');
-const axios = require('axios');
-const socket = require('../sockets');
+const { verifyWebhook } = require('../middleware/webhook');
 
 const storeController = new StoreController(redis.redisClient);
 
 router.get('/shopify/authorize', auth, (req, res) => {
-	const redirectUri = `${process.env.URL}${shopify.config.auth.callbackPath}`;
+	const url = process.env.NODE_ENV === "development" ? process.env.TUNNEL_URL : process.env.URL;
+	const redirectUri = `${url}${shopify.config.auth.callbackPath}`;
 	const authorizationUrl = 'https://accounts.shopify.com/store-login?redirect=' + encodeURIComponent(`/admin/oauth/authorize?client_id=${process.env.SHOPIFY_API_KEY}&redirect_uri=${redirectUri}&scope=${process.env.SHOPIFY_SCOPES}`);
 	return res.status(200).json(authorizationUrl);
 });
@@ -35,6 +35,8 @@ router.get(shopify.config.auth.callbackPath, async (req, res) => {
 		};
 
 		await storeController.createStore(store);
+		await storeController.configureStoreWebhookSubscriptions(store.name);
+		await storeController.submitBulkProductVariantsQuery(store.name);
 
 		if (req.session.userId) {
 			await storeController.associateStoreWithUser(store.name, req.session.userId);
@@ -42,7 +44,7 @@ router.get(shopify.config.auth.callbackPath, async (req, res) => {
 		} else {
 			// encripta nome da loja, redireciona para pagina de registrar usuario
 			// ao mandar a requisição para /auth/register, decripta e chama
-			// associateStoreWithUser com id do usua'rio novo
+			// associateStoreWithUser com id do usuario novo
 			return res.redirect(`${process.env.FRONTEND_URL}/register?guid=${encodeURIComponent(encrypt(shop))}`);
 		}
 
@@ -100,14 +102,15 @@ router.post('/shopify/most-wanted', auth, async (req, res) => {
 	};
 });
 
-router.post('/shopify/products', auth, storeExists, async (req, res) => {
-	const { store } = req.body;
+router.get('/shopify/products', auth, storeExists, async (req, res) => {
+	const { store } = req.query;
+
 	if (!store) {
 		return res.status(400).json({ success: false, message: 'Invalid request body, missing store' })
 	};
 
 	try {
-		const products = await storeController.readStoreProducts(store);
+		const products = await storeController.getAllProducts(store);
 		return res.json(products);
 	} catch (error) {
 		logger.error(error);
@@ -115,14 +118,14 @@ router.post('/shopify/products', auth, storeExists, async (req, res) => {
 	}
 });
 
-router.post('/shopify/product', auth, async (req, res) => {
-	const { store, productId } = req.body;
+router.get('/shopify/product', auth, async (req, res) => {
+	const { store, productId } = req.query;
 	if (!store || !productId) {
-		return res.status(400).json({ success: false, message: 'Invalid request body, missing product id' })
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
 	try {
-		const product = await storeController.fetchStoreProduct(store, productId);
+		const product = await storeController.getProduct(store, productId);
 		if (product) {
 			return res.json(product);
 		} else {
@@ -135,18 +138,14 @@ router.post('/shopify/product', auth, async (req, res) => {
 
 router.post('/shopify/product-orders', auth, storeExists, async (req, res) => {
 	const { store, productId, start, end } = req.body;
-	if (!store) {
-		return res.status(400).json({ success: false, message: 'Invalid request body, missing store' })
+
+	if (!store || !productId || !start || !end) {
+		return res.status(400).json({ success: false, message: 'Invalid request body' })
 	};
 
 	try {
 		let orderData;
-		if (productId) {
-			//TODO: return sales data for a single product
-			orderData = await storeController.fetchStoreProductOrdersByProductId(store, productId, start, end);
-		} else {
-			orderData = await storeController.fetchStoreProductOrders(store, start, end);
-		};
+		orderData = await storeController.fetchOrdersByProductId(store, productId, start, end);
 		return res.json(orderData);
 	} catch (error) {
 		logger.error(error);
@@ -161,7 +160,7 @@ router.post('/shopify/import-products', auth, storeExists, async (req, res) => {
 	};
 
 	try {
-		await storeController.submitBulkProductsQuery(store);
+		await storeController.submitBulkProductVariantsQuery(store);
 		return res.sendStatus(200);
 	} catch (error) {
 		logger.error(error);
@@ -169,7 +168,7 @@ router.post('/shopify/import-products', auth, storeExists, async (req, res) => {
 	}
 });
 
-router.post('/shopify/products-bulk-read', async (req, res) => {
+router.post('/shopify/webhooks/products-bulk-read', async (req, res) => {
 	try {
 		const {
 			admin_graphql_api_id,
@@ -181,16 +180,68 @@ router.post('/shopify/products-bulk-read', async (req, res) => {
 		} = req.body;
 		const storeId = req.headers['x-shopify-shop-domain'];
 
-		let products = await storeController.fetchBulkProductsQueryJSONL(storeId, admin_graphql_api_id);
+		let products = await storeController.readProductVariantsFromJSONL(storeId, admin_graphql_api_id);
 		products = products.map(product => {
 			let productJSON = JSON.parse(product);
-			productJSON.id = productJSON.id.split("/").slice(-1)[0];
-			return JSON.stringify(productJSON);
+			const productId = Number(String(productJSON.id).split("/").slice(-1)[0]);
+			return [productId, product];
 		});
-		await storeController.saveStoreProducts(storeId, products);
+
+		await storeController.createAllProducts(storeId, products);
+		res.sendStatus(200);
+	} catch (error) {
+		res.status(500);
+		logger.error(error);
+	}
+});
+
+router.post('/shopify/webhooks/product', async (req, res) => {
+	try {
+		const {
+			admin_graphql_api_id,
+			completed_at,
+			created_at,
+			error_code,
+			status,
+			type,
+			id: productId
+		} = req.body;
+
+		const topic = req.headers['x-shopify-topic'];
+		const storeId = req.headers['x-shopify-shop-domain'];
+		const webhookId = req.headers['x-shopify-webhook-id']; //TODO: queue this, stop double executing...
+
+		const productData = req.body;
+
+		switch (topic) {
+			case 'products/create':
+				await storeController.createProduct(storeId, productData);
+				break;
+
+			case 'products/update':
+				const products = await storeController.getAllProducts(storeId);
+				const outdatedProduct = products.find(product => {
+					const parsedProductId = Number(String(product.id).split("/").slice(-1)[0]);
+					return parsedProductId === productData.id;
+				});
+
+				const updatedProduct = await storeController.fetchProduct(storeId, outdatedProduct.id);
+				await storeController.updateProduct(storeId, updatedProduct);
+				break;
+
+			case 'products/delete':
+				await storeController.deleteProduct(storeId, productData.id);
+				break;
+
+			default:
+				logger.warn(`Unhandled webhook topic '${topic}' for store '${storeId}'`);
+				return res.sendStatus(400);
+		}
+
 		res.sendStatus(200);
 	} catch (error) {
 		logger.error(error);
+		res.status(500).json({ error: 'Internal Server Error' });
 	}
 });
 
