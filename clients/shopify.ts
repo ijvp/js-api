@@ -27,4 +27,4 @@ const shopify = shopifyApp({
 	)
 });
 
-module.exports = shopify;
+export default shopify;

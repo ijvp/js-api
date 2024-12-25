@@ -1,12 +1,13 @@
 {
   "name": "iris-backend",
+  "type": "module",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "export NODE_ENV=development && nodemon server.js",
-    "start": "node server.js",
+    "dev": "export NODE_ENV=development && tsx watch server.ts",
+    "start": "tsx server.ts",
     "docker": "docker network create dashboard-network && docker-compose -f docker/docker-compose.yml up --build -d && docker-compose up",
     "dockerDown": "docker-compose down && docker-compose -f docker/docker-compose.yml down && docker network rm dashboard-network",
     "redis": "docker-compose -f docker/docker-compose.yml up -d",
@@ -38,12 +39,18 @@
     "passport": "^0.6.0",
     "passport-local": "^1.0.0",
     "passport-local-mongoose": "^7.1.2",
+    "pg": "^8.13.1",
     "pino": "^8.12.0",
     "pino-pretty": "^10.0.0",
     "redis-om": "^0.3.6",
     "socket.io": "^4.7.1"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "@types/socket.io": "^3.0.2",
+    "nodemon": "^2.0.22",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
   }
 }

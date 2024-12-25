@@ -1,10 +1,10 @@
-const CryptoJS = require('crypto-js');
+import CryptoJS from "crypto-js";
 
-const encrypt = (text) => {
+export const encrypt = (text) => {
 	return CryptoJS.AES.encrypt(text, process.env.CRYPTO_SECRET).toString();
 };
 
-const decrypt = (cypher) => {
+export const decrypt = (cypher) => {
 	return CryptoJS.AES.decrypt(cypher, process.env.CRYPTO_SECRET).toString(CryptoJS.enc.Utf8);
 };
 
@@ -30,5 +30,3 @@ const getToken = (req, platform, type = "access") => {
 
 	return foundToken;
 }
-
-module.exports = { encrypt, decrypt, getToken };
