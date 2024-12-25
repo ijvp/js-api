@@ -7,6 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "export NODE_ENV=development && tsx watch server.ts",
+    "tunnel": "ngrok http --url=oriented-better-pigeon.ngrok-free.app 8080",
     "start": "tsx server.ts",
     "docker": "docker network create dashboard-network && docker-compose -f docker/docker-compose.yml up --build -d && docker-compose up",
     "dockerDown": "docker-compose down && docker-compose -f docker/docker-compose.yml down && docker network rm dashboard-network",

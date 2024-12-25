@@ -9,7 +9,6 @@ export default class ShopController {
 	private redisClient: RedisClient;
 	private webhookUrl: String;
 
-
 	constructor(redisClient: RedisClient, webhookUrl: String) {
 		this.redisClient = redisClient;
 		this.webhookUrl = webhookUrl;
