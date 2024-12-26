@@ -1,9 +1,9 @@
-import { Cluster, ClusterNode, ClusterOptions } from "ioredis";
+import { Redis, Cluster, ClusterNode, ClusterOptions } from "ioredis";
 import logger from "../utils/logger";
 import RedisStore from "connect-redis";
 
 export default class RedisService {
-	public readonly redisClient: Cluster;
+	public readonly redisClient: Redis;
 	public readonly redisStore: RedisStore;
 	
 	public readonly clusterOptions: ClusterOptions = {
@@ -13,27 +13,31 @@ export default class RedisService {
 			tls: {
 				checkServerIdentity: (servername, cert) => { return undefined }
 			}
-		},
-		clusterRetryStrategy(times, reason) {
-			null
-		},
+		}
 		
 	}
 
 	constructor() {
-		const node: ClusterNode = {
-			host: process.env.REDIS_HOST,
-			port: Number.parseInt(process.env.REDIS_PORT || "6379")
-		}
+		// const node: ClusterNode = {
+		// 	host: process.env.REDIS_HOST,
+		// 	port: Number.parseInt(process.env.REDIS_PORT || "6379")
+		// }
 
-		this.redisClient = new Cluster([node], this.clusterOptions);
-		this.configureClientLogs();
+		// this.redisClient = new Cluster([node], this.clusterOptions);
+
+		this.redisClient = new Redis(
+			{
+				host: process.env.REDIS_HOST,
+				port: Number.parseInt(process.env.REDIS_PORT || "6379")
+			}
+		);
 
 		this.redisStore = new RedisStore({
 			client: this.redisClient,
-			prefix: 'sessions:',
-			ttl: 86400
+			prefix: 'sessions:'
 		});
+
+		this.configureClientLogs();
 	}
 
 	private configureClientLogs() {

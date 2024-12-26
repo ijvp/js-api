@@ -4,7 +4,7 @@ import logger from '../utils/logger';
 
 class DefaultController extends ResourceController {
     constructor() {
-        super('');
+        super('/');
         this.initializeRoutes();
     }
 

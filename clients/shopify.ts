@@ -1,13 +1,11 @@
 import { ApiVersion } from '@shopify/shopify-api';
-import { restResources } from '@shopify/shopify-api/rest/admin/2023-04';
 import { ShopifyApp, shopifyApp } from '@shopify/shopify-app-express';
 import { RedisSessionStorage } from '@shopify/shopify-app-session-storage-redis';
+
 
 class ShopifyClient {
     public readonly shopify: ShopifyApp;
 	
-    private static instance: ShopifyClient;
-
     constructor() {
         this.shopify = shopifyApp({
             api: {
@@ -17,8 +15,7 @@ class ShopifyClient {
                 scopes: [process.env.SHOPIFY_SCOPES],
                 hostName: process.env.NODE_ENV === 'development' ? process.env.TUNNEL_URL : process.env.URL,
                 hostScheme: 'https',
-                isEmbeddedApp: false,
-                restResources
+                isEmbeddedApp: false
             },
             auth: {
                 path: '/shopify/auth',
@@ -26,13 +23,13 @@ class ShopifyClient {
             },
             webhooks: {
                 path: '/shopify/webhooks'
-            }
-            // sessionStorage: new RedisSessionStorage(
-            //     `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
-            //     {
-            //         sessionKeyPrefix: "shopify_sessions:"
-            //     }
-            // )
+            },
+            sessionStorage: new RedisSessionStorage(
+                `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
+                {
+                    sessionKeyPrefix: "shopify_sessions:",
+                }
+            )
         });
     }
 }

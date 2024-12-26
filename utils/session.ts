@@ -14,4 +14,7 @@ export const logOut = (req, res) => {
 	});
 };
 
-export const isLoggedIn = (req) => !!req?.session?.userId;
+export const isLoggedIn = (req) => { 
+	console.log(req.session);
+	return !!req?.session?.userId 
+};

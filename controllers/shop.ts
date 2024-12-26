@@ -1,15 +1,11 @@
-import express, { Request, Response, Router, NextFunction } from 'express';
+import { Request, Response } from 'express';
 import logger from '../utils/logger';
-import { getStoreApiURL, extractHttpsUrl, extractTimezoneOffset } from '../utils/shop';
-import axios from 'axios';
-import readline from 'readline';
-import fs from 'fs';
 import { RedisClient } from 'ioredis/built/connectors/SentinelConnector/types';
 import ResourceController from './resource';
 import { ShopifyApp } from '@shopify/shopify-app-express';
-import shopify from '../clients/shopify';
 import { auth } from '../middleware/auth';
 import ShopifyClient from '../clients/shopify';
+import { logIn } from '../utils/session';
 
 export default class ShopController extends ResourceController {
 	readonly webhookUrl: String;
@@ -31,7 +27,7 @@ export default class ShopController extends ResourceController {
 	}
 
 	loginToShop(req: Request, res: Response) {
-		const storeLoginURL = 'https://accounts.shopify.com/store-login?redirect=' + 
+		const storeLoginURL = 'https://accounts.shopify.com/store-login?redirect=' +
 			encodeURIComponent(`/admin/oauth/authorize
 				?client_id=${process.env.SHOPIFY_CLIENT_ID}
 				&redirect_uri=${this.getFullAuthCallbackURL()}

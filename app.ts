@@ -46,17 +46,22 @@ export default class App {
 		this.app.use(express.urlencoded({ extended: true }));
 
 		// Redis session middleware
-		// this.app.use(session({
-		// 	store: new RedisService().redisStore,
-		// 	secret: process.env.SESSION_SECRET,
-		// 	resave: false,
-		// 	saveUninitialized: false,
-		// 	cookie: {
-		// 		domain: process.env.NODE_ENV !== 'development' ? 'turbopartners.com.br' : "",
-		// 		secure: process.env.NODE_ENV !== 'development',
-		// 		sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax'
-		// 	}
-		// }));
+		this.app.use(session({
+			store: new RedisService().redisStore,
+			secret: process.env.SESSION_SECRET,
+			resave: false,
+			saveUninitialized: false,
+			cookie: {
+				secure: false,
+				httpOnly: true,
+				maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
+			}
+		}));
+
+		// Passport middleware
+		this.app.use(passport.initialize());
+		this.app.use(passport.session());
+
 
 		// CORS middleware
 		// const whitelist = [
@@ -85,10 +90,6 @@ export default class App {
 		// });
 
 		// this.app.use(cors(corsOptions));
-
-		// Passport middleware
-		// this.app.use(passport.initialize());
-		// this.app.use(passport.session());
 
 		// App routes config
 		// this.app.get('/health', (request: Response, res: Response) => {
@@ -119,7 +120,6 @@ export default class App {
 
 	public listen() {
 		this.app.listen(this.port, () => {
-			logger.info('Mode: %s', this.environment);
 			logger.info('App listening on port %d', this.port);
 			// connect();
 		});

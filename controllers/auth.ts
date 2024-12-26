@@ -4,8 +4,8 @@ import { logIn, logOut } from '../utils/session';
 import { encrypt, decrypt } from '../utils/crypto';
 import { User } from '../models/User';
 import { auth } from '../middleware/auth';
-import ShopController from '../controllers/shop';
-import ResourceController from '../controllers/resource';
+import ShopController from './shop';
+import ResourceController from './resource';
 
 export default class AuthController extends ResourceController {
 	readonly shopController: ShopController;
@@ -20,7 +20,7 @@ export default class AuthController extends ResourceController {
 		this.router.post('/login', this.login);
 		this.router.get('/logout', auth, this.logout);
 		this.router.post('/update', auth, this.update);
-		this.router.get('/me', auth, this.whoAmI);
+		this.router.get('/me', this.whoAmI);
 	}
 
 	async register(req: Request, res: Response) {
