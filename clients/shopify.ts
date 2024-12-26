@@ -1,30 +1,40 @@
-const { restResources } = require('@shopify/shopify-api/rest/admin/2023-04');
-const { shopifyApp } = require('@shopify/shopify-app-express');
-const { RedisSessionStorage } = require('@shopify/shopify-app-session-storage-redis');
+import { ApiVersion } from '@shopify/shopify-api';
+import { restResources } from '@shopify/shopify-api/rest/admin/2023-04';
+import { ShopifyApp, shopifyApp } from '@shopify/shopify-app-express';
+import { RedisSessionStorage } from '@shopify/shopify-app-session-storage-redis';
 
-const shopify = shopifyApp({
-	api: {
-		apiKey: process.env.SHOPIFY_API_KEY,
-		apiSecretKey: process.env.SHOPIFY_API_SECRET,
-		scopes: [process.env.SHOPIFY_SCOPES],
-		hostName: process.env.URL,
-		hostScheme: process.env.NODE_ENV === 'development' ? 'http' : 'https',
-		isEmbeddedApp: false,
-		restResources
-	},
-	auth: {
-		path: '/shopify/auth',
-		callbackPath: '/shopify/auth/callback'
-	},
-	webhooks: {
-		path: '/shopify/webhooks'
-	},
-	sessionStorage: new RedisSessionStorage(
-		`redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
-		{
-			sessionKeyPrefix: "shopify_sessions:"
-		}
-	)
-});
+class ShopifyClient {
+    public readonly shopify: ShopifyApp;
+	
+    private static instance: ShopifyClient;
 
-export default shopify;
+    constructor() {
+        this.shopify = shopifyApp({
+            api: {
+                apiKey: process.env.SHOPIFY_CLIENT_ID,
+                apiSecretKey: process.env.SHOPIFY_CLIENT_SECRET,
+                apiVersion: process.env.SHOPIFY_API_VERSION as ApiVersion,
+                scopes: [process.env.SHOPIFY_SCOPES],
+                hostName: process.env.NODE_ENV === 'development' ? process.env.TUNNEL_URL : process.env.URL,
+                hostScheme: 'https',
+                isEmbeddedApp: false,
+                restResources
+            },
+            auth: {
+                path: '/shopify/auth',
+                callbackPath: '/shopify/auth/callback'
+            },
+            webhooks: {
+                path: '/shopify/webhooks'
+            }
+            // sessionStorage: new RedisSessionStorage(
+            //     `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`,
+            //     {
+            //         sessionKeyPrefix: "shopify_sessions:"
+            //     }
+            // )
+        });
+    }
+}
+
+export default ShopifyClient;

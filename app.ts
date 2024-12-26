@@ -105,6 +105,7 @@ export default class App {
 
 	private initializeControllers(controllers) {
 		controllers.forEach((controller) => {
+			logger.info(`Registering controller for resource: ${controller.path}`);
 			this.app.use(controller.path, controller.router);
 		});
 	}
@@ -118,7 +119,7 @@ export default class App {
 
 	public listen() {
 		this.app.listen(this.port, () => {
-			logger.info('NODE ENV: %s', this.environment);
+			logger.info('Mode: %s', this.environment);
 			logger.info('App listening on port %d', this.port);
 			// connect();
 		});

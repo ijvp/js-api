@@ -1,18 +1,64 @@
+import express, { Request, Response, Router, NextFunction } from 'express';
 import logger from '../utils/logger';
 import { getStoreApiURL, extractHttpsUrl, extractTimezoneOffset } from '../utils/shop';
 import axios from 'axios';
 import readline from 'readline';
 import fs from 'fs';
 import { RedisClient } from 'ioredis/built/connectors/SentinelConnector/types';
+import ResourceController from './resource';
+import { ShopifyApp } from '@shopify/shopify-app-express';
+import shopify from '../clients/shopify';
+import { auth } from '../middleware/auth';
+import ShopifyClient from '../clients/shopify';
 
-export default class ShopController {
-	private redisClient: RedisClient;
-	private webhookUrl: String;
+export default class ShopController extends ResourceController {
+	readonly webhookUrl: String;
 
-	constructor(redisClient: RedisClient, webhookUrl: String) {
-		this.redisClient = redisClient;
-		this.webhookUrl = webhookUrl;
+	redisClient: RedisClient;
+	shopify: ShopifyApp;
+
+	constructor() {
+		super('/shopify');
+		// this.redisClient = redisClient;
+		this.shopify = new ShopifyClient().shopify;
+		this.initializeRoutes();
 	};
+
+	initializeRoutes(): void {
+		this.router.get('/login', this.loginToShop.bind(this));
+		this.router.get('/auth', this.shopify.auth.begin());
+		this.router.get('/auth/callback', this.shopify.auth.callback(), this.shopify.redirectToShopifyOrAppRoot());
+	}
+
+	loginToShop(req: Request, res: Response) {
+		const storeLoginURL = 'https://accounts.shopify.com/store-login?redirect=' + 
+			encodeURIComponent(`/admin/oauth/authorize
+				?client_id=${process.env.SHOPIFY_CLIENT_ID}
+				&redirect_uri=${this.getFullAuthCallbackURL()}
+				&scope=${process.env.SHOPIFY_SCOPES}`
+			);
+
+		res.redirect(storeLoginURL);
+	}
+
+	private getFullAuthCallbackURL(): string {
+		const scheme = this.shopify.api.config.hostScheme;
+		const host = this.shopify.api.config.hostName;
+		const path = this.shopify.config.auth.callbackPath;
+
+		return `${scheme}://${host}${path}`;
+	}
+	// async authorize(req, res) {
+	// 	const { shop, hmac, timestamp } = req.query;
+	// 	console.log('authorizing', shop, hmac, timestamp);
+	// 	this.shopify.auth.begin();
+	// }
+
+	// async authCallback(req, res) {
+	// 	const { shop, hmac, timestamp } = req.query;
+	// 	console.log('callback', shop, hmac, timestamp);
+	// 	this.shopify.auth.callback();
+	// }
 
 	// async createStore(store) {
 	// 	try {
@@ -549,7 +595,7 @@ export default class ShopController {
 	// 					id
 	// 				}
 	// 			}
-		
+
 	// 			deleteProductSubscription: webhookSubscriptionCreate(
 	// 				topic: PRODUCTS_DELETE
 	// 				webhookSubscription: {
@@ -565,7 +611,7 @@ export default class ShopController {
 	// 					id
 	// 				}
 	// 			}
-		
+
 	// 			updateProductSubscription: webhookSubscriptionCreate(
 	// 				topic: PRODUCTS_UPDATE
 	// 				webhookSubscription: {

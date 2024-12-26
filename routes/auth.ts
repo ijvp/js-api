@@ -5,17 +5,17 @@ import { encrypt, decrypt } from '../utils/crypto';
 import { User } from '../models/User';
 import { auth } from '../middleware/auth';
 import ShopController from '../controllers/shop';
+import ResourceController from '../controllers/resource';
 
-export default class AuthController {
-	public path = "/auth";
-	public router = express.Router();
-	private readonly shopController: ShopController;
+export default class AuthController extends ResourceController {
+	readonly shopController: ShopController;
 
 	constructor() {
+		super('/auth');
 		this.initializeRoutes();
 	}
 
-	private initializeRoutes() {
+	initializeRoutes(): void {
 		this.router.post('/register', this.register);
 		this.router.post('/login', this.login);
 		this.router.get('/logout', auth, this.logout);
@@ -23,7 +23,7 @@ export default class AuthController {
 		this.router.get('/me', auth, this.whoAmI);
 	}
 
-	private register = async (req: Request, res: Response) => {
+	async register(req: Request, res: Response) {
 		try {
 			const { username, password } = req.body;
 			const { guid } = req.query;
@@ -57,7 +57,7 @@ export default class AuthController {
 		}
 	}
 
-	private login = async (req: Request, res: Response) => {
+	async login(req: Request, res: Response) {
 		const { username, password } = req.body;
 
 		// try {
@@ -78,13 +78,13 @@ export default class AuthController {
 		res.status(200).json({ success: true, message: 'User logged in' });
 	}
 
-	private logout = async (req: Request, res: Response) => {
+	async logout(req: Request, res: Response) {
 		await logOut(req, res);
 		res.clearCookie('connect.sid');
 		res.status(200).json({ success: true, message: "User logged out" });
 	}
 
-	private update = async (req: Request, res: Response) => {
+	async update(req: Request, res: Response) {
 		const { username, password, newPassword } = req.body;
 
 		logger.info('Update route hit', { username, password, newPassword });
@@ -125,7 +125,7 @@ export default class AuthController {
 		// };
 	}
 
-	private whoAmI = async (req: Request, res: Response) => {
+	async whoAmI(req: Request, res: Response) {
 		// const { id, username } = await User.findById(req.session.userId);
 		logger.info('WhoAmI route hit');
 		res.status(200).json({ id: 1, username: 'test' });
