@@ -18,7 +18,7 @@ export class UnauthenticatedError extends Error {
 
 export const auth = (req: Request, res: Response, next: NextFunction): void => {
     if (!isLoggedIn(req)) {
-        logger.warn(`Unauthenticated request at '${req.path}'`);
+        logger.warn(`Unauthenticated request at '${req.originalUrl}'`);
         const err = new UnauthenticatedError("User is not logged in", 401);
 		next(err);
     }

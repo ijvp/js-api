@@ -15,7 +15,7 @@ class DefaultController extends ResourceController {
 
     private ping(req: Request, res: Response) {
         logger.info("Pong!");
-        res.json({ message: 'pong' });
+        res.json('pong');
     }
 
     private redirectToAuthMe(req: Request, res: Response) {

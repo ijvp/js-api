@@ -32,6 +32,7 @@ export default class ShopController extends ResourceController {
 			(req, res, next) => {
 				if (req.query.shop) {
 					logIn(req, req.query.shop.toString());
+					//TODO: redirect /auth/login ?
 				} else {
 					next(new Error('Missing shop parameter'));
 				}
@@ -52,6 +53,71 @@ export default class ShopController extends ResourceController {
 		res.redirect(storeLoginURL);
 	}
 
+	getOrders(req: Request, res: Response) {
+		this.shopify.api.clients.Graphql.query({
+			data: `{
+				orders(first: 10) {
+					edges {
+						node {
+							id
+							name
+						}
+					}
+				}
+			}`
+		}).then((result) => {
+			res.json(result);
+		}).catch((error) => {
+			logger.error(error);
+			res.status(500).json({ message: 'Internal server error' });
+		});
+
+		// const ordersQuery = `
+		// 		query {
+		// 			orders(first: 250, query: "created_at:>=${start} created_at:<=${end}") {
+		// 				edges {
+		// 					node {
+		// 						id
+		// 						lineItems(first: 250) {
+		// 							edges {
+		// 								node {
+		// 									quantity
+		// 									product {
+		// 										title
+		// 										priceRangeV2 {
+		// 											maxVariantPrice {
+		// 												amount
+		// 												currencyCode
+		// 											}
+		// 											minVariantPrice {
+		// 												amount
+		// 												currencyCode
+		// 											}
+		// 										}
+		// 									}
+		// 								}
+		// 							}
+		// 						}
+		// 					}
+		// 				}
+		// 			}
+		// 		}
+		// 	`;
+
+		// const response = await axios.post(graphqlEndpoint,
+		// 	{
+		// 		query: ordersQuery
+		// 	},
+		// 	{
+		// 		headers: {
+		// 			'Content-Type': 'application/json',
+		// 			'X-Shopify-Access-Token': accessToken
+		// 		}
+		// 	}
+		// );
+	};
+
+	//useful for multi shop login redirect
 	private getFullAuthCallbackURL(): string {
 		const scheme = this.shopify.api.config.hostScheme;
 		const host = this.shopify.api.config.hostName;
@@ -59,17 +125,7 @@ export default class ShopController extends ResourceController {
 
 		return `${scheme}://${host}${path}`;
 	}
-	// async authorize(req, res) {
-	// 	const { shop, hmac, timestamp } = req.query;
-	// 	console.log('authorizing', shop, hmac, timestamp);
-	// 	this.shopify.auth.begin();
-	// }
 
-	// async authCallback(req, res) {
-	// 	const { shop, hmac, timestamp } = req.query;
-	// 	console.log('callback', shop, hmac, timestamp);
-	// 	this.shopify.auth.callback();
-	// }
 
 	// async createStore(store) {
 	// 	try {
