@@ -20,7 +20,7 @@ export default class AuthController extends ResourceController {
 		this.router.post('/login', this.login);
 		this.router.get('/logout', auth, this.logout);
 		this.router.post('/update', auth, this.update);
-		this.router.get('/me', this.whoAmI);
+		this.router.get('/me', auth, this.whoAmI);
 	}
 
 	async register(req: Request, res: Response) {
@@ -126,9 +126,7 @@ export default class AuthController extends ResourceController {
 	}
 
 	async whoAmI(req: Request, res: Response) {
-		// const { id, username } = await User.findById(req.session.userId);
-		logger.info('WhoAmI route hit');
-		res.status(200).json({ id: 1, username: 'test' });
+		res.status(200).json(req.session.userId);
 	}
 }
 

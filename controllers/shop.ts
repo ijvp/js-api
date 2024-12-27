@@ -6,6 +6,7 @@ import { ShopifyApp } from '@shopify/shopify-app-express';
 import { auth } from '../middleware/auth';
 import ShopifyClient from '../clients/shopify';
 import { logIn } from '../utils/session';
+import { verifyHMAC } from '../middleware/shopify';
 
 export default class ShopController extends ResourceController {
 	readonly webhookUrl: String;
@@ -20,10 +21,24 @@ export default class ShopController extends ResourceController {
 		this.initializeRoutes();
 	};
 
+	//callback should store userId: <store domain> in session
+	//session can use userId to get shopify_sessions:<userId>
 	initializeRoutes(): void {
 		this.router.get('/login', this.loginToShop.bind(this));
 		this.router.get('/auth', this.shopify.auth.begin());
-		this.router.get('/auth/callback', this.shopify.auth.callback(), this.shopify.redirectToShopifyOrAppRoot());
+		this.router.get('/auth/callback',
+			verifyHMAC,
+			this.shopify.auth.callback(),
+			(req, res, next) => {
+				if (req.query.shop) {
+					logIn(req, req.query.shop.toString());
+				} else {
+					next(new Error('Missing shop parameter'));
+				}
+				next();
+			},
+			this.shopify.redirectToShopifyOrAppRoot()
+		);
 	}
 
 	loginToShop(req: Request, res: Response) {

@@ -22,6 +22,8 @@ export const auth = (req: Request, res: Response, next: NextFunction): void => {
         const err = new UnauthenticatedError("User is not logged in", 401);
 		next(err);
     }
+
+	next();
 };
 
 export const errorHandler = (error, req: Request, res: Response, next: NextFunction) => {
