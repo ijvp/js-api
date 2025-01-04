@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: `.env.${process.env.NODE_ENV}` });
+
 import App from "./app";
 import logger from "./utils/logger";
 import DefaultController from "./controllers/default";

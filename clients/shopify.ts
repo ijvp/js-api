@@ -14,7 +14,7 @@ class ShopifyClient {
 				apiSecretKey: process.env.SHOPIFY_CLIENT_SECRET,
 				apiVersion: process.env.SHOPIFY_API_VERSION as ApiVersion,
 				scopes: [process.env.SHOPIFY_SCOPES],
-				hostName: process.env.NODE_ENV === 'development' ? process.env.TUNNEL_URL : process.env.URL,
+				hostName: process.env.URL,
 				hostScheme: 'https',
 				isEmbeddedApp: false
 			},

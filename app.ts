@@ -1,6 +1,4 @@
 // packages
-import dotenv from 'dotenv';
-dotenv.config();
 
 import '@shopify/shopify-api/adapters/node';
 import express, { Application } from "express";
