@@ -11,4 +11,8 @@ COPY dist ./dist
 
 EXPOSE 8080
 
-CMD ["node", "dist/server.js"]
+# Set the environment variable
+ENV NODE_ENV=${NODE_ENV}
+
+# Command to run the application
+CMD ["node", "dist/index.js"]
