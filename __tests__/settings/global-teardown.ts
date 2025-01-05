@@ -4,6 +4,9 @@ import { execSync } from 'child_process';
 
 export default async () => {
     console.time('global-teardown');
-    await dockerCompose.down();
+    await dockerCompose.down({
+        cwd: path.join(__dirname),
+        log: true
+    });
     console.timeEnd('global-teardown');
 };
