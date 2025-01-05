@@ -1,5 +1,6 @@
-# Tests and builds the node application, then creates a docker image and pushes it to ECR.
-# Finally, it deploys the container to an EC2 instance.
+# Tests and builds the node application, then uploads the build to GH artifact registry.
+# Then creates a docker image and pushes it to ECR. Finally, ssh into an EC2 instance
+# and deploys the container.
 
 name: "Deploy API to EC2"
 
@@ -27,16 +28,22 @@ jobs:
       - run: npm run build
       - run: npm test
 
+      - name: Upload compiled service to artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: ./dist
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Use Node.js
-        uses: actions/checkout@v4
+      - name: Download dist directory
+        uses: actions/download-artifact@v3
         with:
-          node-version: "20.x"
-          persist-credentials: false
+          name: dist
+          path: ./dist
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
