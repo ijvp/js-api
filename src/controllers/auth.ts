@@ -8,7 +8,7 @@ import ShopController from './shop';
 import ResourceController from './resource';
 
 export default class AuthController extends ResourceController {
-	readonly shopController: ShopController;
+	// readonly shopController: ShopController;
 
 	constructor() {
 		super('/auth');

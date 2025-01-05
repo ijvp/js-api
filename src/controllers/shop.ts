@@ -10,10 +10,10 @@ import { verifyHMAC } from '../middleware/shopify';
 import ShopifyService from '../clients/shopify';
 
 export default class ShopController extends ResourceController {
-	readonly webhookUrl: String;
-
-	redisClient: RedisClient;
 	shopifyService: ShopifyService;
+	// readonly webhookUrl: String;
+	// redisClient: RedisClient;
+	
 
 	constructor() {
 		super('/shopify');

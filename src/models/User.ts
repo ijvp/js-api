@@ -4,9 +4,9 @@ import { decrypt } from '../utils/crypto';
 const { Schema } = mongoose;
 
 class UserClass {
-	password: string;
+	password!: string;
 
-	matchesPassword(password) {
+	matchesPassword(password: string) {
 		return password === decrypt(this.password);
 	}
 }

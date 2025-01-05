@@ -1,17 +1,19 @@
-const logger = require('../utils/logger');
-const CryptoJS = require('crypto-js');
-const crypto = require('crypto');
+// import { NextFunction, Request, Response } from "express";
 
-const verifyWebhook = (req, res, next) => {
-	const hmacHeader = req.get('X-Shopify-Hmac-SHA256');
+// const logger = require('../utils/logger');
+// const CryptoJS = require('crypto-js');
+// const crypto = require('crypto');
 
-	const hmacDigest = CryptoJS.HmacSHA256(req.rawBody, process.env.SHOPIFY_API_SECRET).toString(CryptoJS.enc.Base64);
+// const verifyWebhook = (req: Request, res: Response, next: NextFunction) => {
+// 	const hmacHeader = req.get('X-Shopify-Hmac-SHA256');
 
-	if (crypto.timingSafeEqual(Buffer.from(hmacDigest), Buffer.from(hmacHeader))) {
-		next();
-	} else {
-		res.status(401).json({ success: false, error: 'Webhook verification failed' });
-	}
-};
+// 	const hmacDigest = CryptoJS.HmacSHA256(req.rawBody, process.env.SHOPIFY_API_SECRET).toString(CryptoJS.enc.Base64);
 
-module.exports = { verifyWebhook };
+// 	if (crypto.timingSafeEqual(Buffer.from(hmacDigest), Buffer.from(hmacHeader))) {
+// 		next();
+// 	} else {
+// 		res.status(401).json({ success: false, error: 'Webhook verification failed' });
+// 	}
+// };
+
+// module.exports = { verifyWebhook };

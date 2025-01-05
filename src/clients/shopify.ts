@@ -14,7 +14,7 @@ export default class ShopifyService {
 				apiKey: process.env.SHOPIFY_CLIENT_ID,
 				apiSecretKey: process.env.SHOPIFY_CLIENT_SECRET,
 				apiVersion: process.env.SHOPIFY_API_VERSION as ApiVersion,
-				scopes: [process.env.SHOPIFY_SCOPES],
+				scopes: [process.env.SHOPIFY_SCOPES!],
 				hostName: process.env.URL,
 				hostScheme: 'https',
 				isEmbeddedApp: false

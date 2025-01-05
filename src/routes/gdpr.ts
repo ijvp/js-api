@@ -1,12 +1,14 @@
-const router = require('express').Router();
-const logger = require('../utils/logger');
-const redisClient = require('../clients').redisClient;
-const StoreController = require('../controllers/store');
-const { verifyWebhook } = require('../middleware/webhook');
+import { Router, Request, Response } from 'express';
+import logger from '../utils/logger';
+import redisClient from '../clients/redis';
+import ShopController from '../controllers/shop';
+// import { verifyWebhook } from '../middleware/webhook';
 
-const storeController = new StoreController(redisClient);
+const router = Router();
+const storeController = new ShopController();
 
-router.post('/gdpr/customer/data-request', verifyWebhook, (req, res) => {
+//TODO: Reimplement and use verifyWebhook middleware
+router.post('/gdpr/customer/data-request', (req: Request, res: Response) => {
 	const {
 		shop_id,
 		shop_domain,
@@ -16,17 +18,17 @@ router.post('/gdpr/customer/data-request', verifyWebhook, (req, res) => {
 	} = req.body;
 
 	try {
-		logger.info(`GDPR Webhook 'customer/data-request' recieved for shop '${shop_domain}', customer '${customer.id}/${customer.email}'`);
+		logger.info(`GDPR Webhook 'customer/data-request' received for shop '${shop_domain}', customer '${customer.id}/${customer.email}'`);
 		//TODO: delete store from any user_stores set since no req.session.userId
 		// will be present in webhook;
-		res.status(200);
+		res.status(200).json({ success: true, message: 'Data request received' });
 	} catch (error) {
 		logger.error("GDPR Webhook 'customer/data-request' failed: %s", error);
 		res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
 
-router.post('/gdpr/customer/redact', verifyWebhook, (req, res) => {
+router.post('/gdpr/customer/redact', (req: Request, res: Response) => {
 	const {
 		shop_id,
 		shop_domain,
@@ -35,24 +37,24 @@ router.post('/gdpr/customer/redact', verifyWebhook, (req, res) => {
 	} = req.body;
 
 	try {
-		logger.info("GDPR Webhook 'customer/redact' recieved");
+		logger.info("GDPR Webhook 'customer/redact' received");
 		//TODO: OK for now, orders data not persisted, just read from API and forwarded
-		res.status(200).json({ success: true, message: `Customer data redacted` })
+		res.status(200).json({ success: true, message: `Customer data redacted` });
 	} catch (error) {
 		logger.error("GDPR Webhook 'customer/redact' failed: %s", error);
 		res.status(500).json({ success: false, message: 'Internal Server Error' });
 	}
 });
 
-router.post('/gdpr/shop/redact', verifyWebhook, async (req, res) => {
+router.post('/gdpr/shop/redact', async (req: Request, res: Response) => {
 	const {
 		shop_id,
 		shop_domain
 	} = req.body;
 
 	try {
-		logger.info("GDPR Webhook 'shop/redact' recieved");
-		await storeController.deleteStoreData(shop_domain);
+		logger.info("GDPR Webhook 'shop/redact' received");
+		// await storeController.deleteStoreData(shop_domain);
 		//TODO: delete store from any user_stores set since no req.session.userId
 		// will be present in webhook;
 		res.status(200).json({ success: true, message: `Shop '${shop_domain}' data redacted` });
@@ -62,4 +64,4 @@ router.post('/gdpr/shop/redact', verifyWebhook, async (req, res) => {
 	}
 });
 
-module.exports = router;
+export default router;

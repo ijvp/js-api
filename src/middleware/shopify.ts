@@ -1,3 +1,4 @@
+import { NextFunction, Request, Response } from 'express';
 import logger from '../utils/logger';
 import crypto from 'crypto';
 
@@ -16,7 +17,7 @@ import crypto from 'crypto';
 // 	}
 // };
 
-export const verifyHMAC = (req, res, next) => {
+export const verifyHMAC = (req: Request, res: Response, next: NextFunction) => {
 	const { hmac, ...queryParams } = req.query;
 
 	const sortedQueryString = Object.keys(queryParams)
@@ -25,14 +26,14 @@ export const verifyHMAC = (req, res, next) => {
 		.join('&');
 
 	const generatedHmac = crypto
-		.createHmac('sha256', process.env.SHOPIFY_CLIENT_SECRET)
+		.createHmac('sha256', process.env.SHOPIFY_CLIENT_SECRET!)
 		.update(sortedQueryString)
 		.digest('hex');
 
 	if (generatedHmac !== hmac) {
 		next(new Error('HMAC validation failed'));
 	}
-	
+
 	logger.info('HMAC validation passed');
 	next();
 }

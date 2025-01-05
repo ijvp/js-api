@@ -1,4 +1,4 @@
-const { GoogleAdsApi } = require('google-ads-api');
+import { GoogleAdsApi } from 'google-ads-api';
 
 const googleClient = new GoogleAdsApi({
 	client_id: `${process.env.GOOGLE_CLIENT_ID}`,
@@ -6,4 +6,4 @@ const googleClient = new GoogleAdsApi({
 	developer_token: `${process.env.GOOGLE_MANAGE_TOKEN}`,
 });
 
-module.exports = googleClient;
+export default googleClient;
