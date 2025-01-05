@@ -28,11 +28,29 @@ jobs:
       - run: npm run build
       - run: npm test
 
-      - name: Upload compiled service to artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: ./dist
+
+      - name: Upload package.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-json
+          path: ./package.json
+
+      - name: Upload package-lock.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock-json
+          path: ./package-lock.json
+
+      - name: Upload Dockerfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dockerfile
+          path: ./Dockerfile
 
   deploy:
     needs: build
@@ -40,10 +58,28 @@ jobs:
 
     steps:
       - name: Download dist directory
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: ./dist
+
+      - name: Download package.json
+        uses: actions/download-artifact@v4
+        with:
+          name: package-json
+          path: ./
+
+      - name: Download package-lock.json
+        uses: actions/download-artifact@v4
+        with:
+          name: package-lock-json
+          path: ./
+
+      - name: Download Dockerfile
+        uses: actions/download-artifact@v4
+        with:
+          name: Dockerfile
+          path: ./
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
