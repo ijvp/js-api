@@ -1,23 +1,18 @@
 import { Request, Response } from 'express';
 import logger from '../utils/logger';
-import { RedisClient } from 'ioredis/built/connectors/SentinelConnector/types';
 import ResourceController from './resource';
-import { ShopifyApp } from '@shopify/shopify-app-express';
 import { auth } from '../middleware/auth';
-import ShopifyClient from '../clients/shopify';
 import { logIn } from '../utils/session';
 import { verifyHMAC } from '../middleware/shopify';
 import ShopifyService from '../clients/shopify';
+import { Session } from '@shopify/shopify-api';
+
 
 export default class ShopController extends ResourceController {
 	shopifyService: ShopifyService;
-	// readonly webhookUrl: String;
-	// redisClient: RedisClient;
-	
 
 	constructor() {
 		super('/shopify');
-		// this.redisClient = redisClient;
 		this.shopifyService = new ShopifyService();
 		this.initializeRoutes();
 	};
@@ -41,6 +36,7 @@ export default class ShopController extends ResourceController {
 			},
 			this.shopifyService.redirectOnAuthCompletion()
 		);
+		this.router.get('/orders', auth, this.shopifyService.validateAuthenticatedSession(), this.getOrders.bind(this));
 	}
 
 	loginToShop(req: Request, res: Response) {
@@ -54,68 +50,10 @@ export default class ShopController extends ResourceController {
 		res.redirect(storeLoginURL);
 	}
 
-	getOrders(req: Request, res: Response) {
-		// this.shopify.api.clients.Graphql.query({
-		// 	data: `{
-		// 		orders(first: 10) {
-		// 			edges {
-		// 				node {
-		// 					id
-		// 					name
-		// 				}
-		// 			}
-		// 		}
-		// 	}`
-		// }).then((result) => {
-		// 	res.json(result);
-		// }).catch((error) => {
-		// 	logger.error(error);
-		// 	res.status(500).json({ message: 'Internal server error' });
-		// });
-
-		// const ordersQuery = `
-		// 		query {
-		// 			orders(first: 250, query: "created_at:>=${start} created_at:<=${end}") {
-		// 				edges {
-		// 					node {
-		// 						id
-		// 						lineItems(first: 250) {
-		// 							edges {
-		// 								node {
-		// 									quantity
-		// 									product {
-		// 										title
-		// 										priceRangeV2 {
-		// 											maxVariantPrice {
-		// 												amount
-		// 												currencyCode
-		// 											}
-		// 											minVariantPrice {
-		// 												amount
-		// 												currencyCode
-		// 											}
-		// 										}
-		// 									}
-		// 								}
-		// 							}
-		// 						}
-		// 					}
-		// 				}
-		// 			}
-		// 		}
-		// 	`;
-
-		// const response = await axios.post(graphqlEndpoint,
-		// 	{
-		// 		query: ordersQuery
-		// 	},
-		// 	{
-		// 		headers: {
-		// 			'Content-Type': 'application/json',
-		// 			'X-Shopify-Access-Token': accessToken
-		// 		}
-		// 	}
-		// );
+	async getOrders(req: Request, res: Response) {
+		const session: Session = res.locals.shopify.session;
+		const data = await this.shopifyService.getLastTenOrders(session);
+		res.status(200).json(data);
 	};
 
 

@@ -1,12 +1,10 @@
-import { ApiVersion, GraphqlClient } from '@shopify/shopify-api';
+import { ApiVersion, GraphqlClient, Session } from '@shopify/shopify-api';
 import { ShopifyApp, shopifyApp } from '@shopify/shopify-app-express';
 import { RedisSessionStorage } from '@shopify/shopify-app-session-storage-redis';
 import logger from '../utils/logger';
 
 export default class ShopifyService {
 	public readonly shopify: ShopifyApp;
-	// public readonly graphqlClient: GraphqlClient;
-
 
 	constructor() {
 		this.shopify = shopifyApp({
@@ -14,7 +12,7 @@ export default class ShopifyService {
 				apiKey: process.env.SHOPIFY_CLIENT_ID,
 				apiSecretKey: process.env.SHOPIFY_CLIENT_SECRET,
 				apiVersion: process.env.SHOPIFY_API_VERSION as ApiVersion,
-				scopes: [process.env.SHOPIFY_SCOPES!],
+				scopes: process.env.SHOPIFY_SCOPES!.split(','),
 				hostName: process.env.URL,
 				hostScheme: 'https',
 				isEmbeddedApp: false
@@ -43,12 +41,44 @@ export default class ShopifyService {
 		// this.graphqlClient = new this.shopify.api.clients.Graphql({ session });
 	};
 
+	public async getLastTenOrders(session: Session) {
+		try {
+			if (!session) {
+				throw new Error('Session is required');
+			}
+
+			const client: GraphqlClient = new this.shopify.api.clients.Graphql({ session });
+			const response: { body: { data: any } } = await client.query({
+				data: `{
+					orders(first: 10) {
+						edges {
+							node {
+								id
+							}
+						}
+					}
+				}`
+			});
+			
+			logger.info(response.body);
+			if (response.body) {
+				return response.body.data;
+			}
+		} catch (error) {
+			logger.error(error);
+		}
+	};
+
 	public getAuthMiddleware() {
 		return this.shopify.auth;
 	};
 
 	public redirectOnAuthCompletion() {
 		return this.shopify.redirectToShopifyOrAppRoot();
+	};
+
+	public validateAuthenticatedSession() {
+		return this.shopify.validateAuthenticatedSession();
 	};
 
 	// public getOrders() {
