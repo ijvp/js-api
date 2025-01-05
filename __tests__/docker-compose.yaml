@@ -1,0 +1,6 @@
+services:
+  session-store:
+    image: redis:latest
+    container_name: iris-redis-for-testing
+    ports:
+      - "6379:6379"

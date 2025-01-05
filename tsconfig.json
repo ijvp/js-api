@@ -1,0 +1,27 @@
+{
+    "exclude": [
+        "./coverage",
+        "./dist",
+        "__tests__",
+        "jest.config.js"
+    ],
+    "ts-node": {
+        "transpileOnly": true,
+        "files": true
+    },
+    "compilerOptions": {
+        "allowSyntheticDefaultImports": true,
+        // "target": "es6",
+        // "module": "commonjs",
+        "target": "ES2019", // or "ES2020", "ESNext", etc.
+        "module": "commonjs", // <--- IMPORTANT: Compile to CommonJS
+        "outDir": "dist", // output folder for compiled files
+        "rootDir": "src", // your source files
+        "strict": true, // optional but recommended
+        "esModuleInterop": true // allow default imports from CJS modules
+    },
+    "include": [
+        "src",
+        "tests"
+, "__tests__/env-setup.ts"    ] // include your source & test folders
+}
