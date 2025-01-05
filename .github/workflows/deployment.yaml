@@ -15,7 +15,7 @@ env:
   SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -32,29 +32,14 @@ jobs:
 
       - name: Run tests
         run: npm test
-      
-      - name: Build
-        run: npm run build
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: build
-          path: ./dist
 
   deploy:
-    needs: build
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          path: ./dist
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v3
@@ -72,7 +57,7 @@ jobs:
 
       - name: Build and push Docker image to ECR
         run: |
-          docker build -t ${{ env.AWS_ECR_REPO }}:latest .
+          docker build -t ${{ env.AWS_ECR_REPO }}:latest --target production --build-arg NODE_ENV=PRODUCTION .
           docker tag ${{ env.AWS_ECR_REPO }}:latest ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
           docker push ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
           docker push ${{ env.AWS_ECR_REPO }}:latest
