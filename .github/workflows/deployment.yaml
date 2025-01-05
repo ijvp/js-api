@@ -54,7 +54,7 @@ jobs:
 
       - name: Build and push Docker image to ECR
         run: |
-          docker build -t ${{ env.AWS_ECR_REPO }}:latest dist
+          docker build -t ${{ env.AWS_ECR_REPO }}:latest ./dist
           docker tag ${{ env.AWS_ECR_REPO }}:latest ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
           docker push ${{ env.AWS_ECR_REPO }}:${{ github.sha }}
           docker push ${{ env.AWS_ECR_REPO }}:latest
