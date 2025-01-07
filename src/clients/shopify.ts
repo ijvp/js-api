@@ -60,7 +60,6 @@ export default class ShopifyService {
 				}`
 			});
 			
-			logger.info(response.body);
 			if (response.body) {
 				return response.body.data;
 			}

@@ -9,12 +9,8 @@
     "build": "tsc",
     "tunnel": "ngrok http --url=oriented-better-pigeon.ngrok-free.app 8080",
     "start:local": "NODE_ENV=local tsx watch src/index.ts",
-    "start:dev": "NODE_ENV=development tsx watch src/index.ts",
-    "start": "NODE_ENV=production node dist/index.js",
-    "docker": "docker network create dashboard-network && docker-compose -f docker/docker-compose.yml up --build -d && docker-compose up",
-    "dockerDown": "docker-compose down && docker-compose -f docker/docker-compose.yml down && docker network rm dashboard-network",
-    "redis": "docker-compose -f docker/docker-compose.yml up -d",
-    "redisDown": "docker-compose -f docker/docker-compose.yml down"
+    "start:dev": "NODE_ENV=development tsx src/index.ts",
+    "start": "NODE_ENV=production node dist/index.js"
   },
   "keywords": [],
   "author": "",
