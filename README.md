@@ -1,55 +1,49 @@
-# Iris Main API (ATUALIZAR ISSO AQUI MANO PELO AMOR DE DEUS)
+# Iris Main API
+Essa é a api principal do projeto Iris. Ela é responsavel por:
+- receber todos as requisições dos nossos usuários no frontend
+- gestão de sessões da aplicação, e das sessões de suas possiveis integrações
+- buscar informações gerais da(s) loja(s) do usuário
+- conectar e validar possiveis integrações com terceiros, diretamente de suas origens ou de algum microservico nosso (e.g: py-api).
 
-## Requerimentos
-- Node (>= 18)
-- NPM
-- Redis
-- [TurboDash Python API](https://github.com/Turbo-Partners/dashboard-python-api) (para requisições google)
 
-## Estrutura de Pastas
-Este é um aplicativo Express com a seguinte estrutura de pastas:
-- `.github/workflows/deployment.yml`: Contém a configuração do fluxo de trabalho de implantação para o GitHub Actions que fará o deploy para o container AWS LightSail.
+## Desenvolvimento
 
-- `clients`: Contém arquivos para interação com clientes externos, como Google, Redis e Shopify. O arquivo `index.js` é o ponto de entrada para exportações de clientes.
+### Requerimentos
+- De preferencia um mac (vão se fuder todos vocês)
+- Docker
+- Node (>= 20)
+- Npm
+- Redis (usuado para cache de sessões)
+- Ngrok (para criar túnel possibilitando fluxo completo de oAuth)
+- [Py-api](https://github.com/ijvp/py-api), responsável pela integração com Google Ads.
 
-- `controllers`: Contém arquivos JavaScript que definem controladores para várias funcionalidades, como Facebook, Google e operações relacionadas à loja.
-
-- `middleware`: Contém funções de middleware usadas no aplicativo, como autenticação e middleware da loja.
-
-- `models`: Contém o arquivo `User.js` que define o modelo mongo do usuário para o aplicativo.
-
-- `routes`: Contém arquivos que definem as rotas da API para autenticação, Facebook, GDPR, Google, Shopify e endpoints relacionados ao usuário. As rotas devem se preocupar apenas com receber requisições e retornar dados dos seus controllers respectivos para o cliente, e não com as regras de negócios em si.
-
-- `utils`: Contém arquivos utilitários para conexão com banco de dados, criptografia, registro, gerenciamento de sessão e funções relacionadas à loja.
-
-- `.env.example`: Um exemplo de arquivo que demonstra a estrutura e as chaves das variáveis de ambiente necessárias para o aplicativo.
-
-- `Dockerfile`: Especifica as instruções para criar uma imagem Docker do aplicativo.
-
-- `package.json`: Contém as dependências e scripts do aplicativo.
-
-- `server.js`: O ponto de entrada principal do aplicativo Express.
-
-## Uso
 
 ### Uso local
-1. Instale as dependências: `npm install`
-2. Crie uma cópia do arquivo `.env.example` e renomeie-o para `.env`. Forneça os valores necessários para cada variável de ambiente.
-3. Roda o projeto em modo de desenvolvimento: `npm run dev`
+Para desenvolvimento isolado desse componento do projeto Iris.
+
+1. Instale as dependências.
+2. Crie os arquivo .env.local e cria as chaves com seus valores seguindo o .env.example.
+3. Verifique se o redis-server está rodando localmente e testa sua conexao: 
+
+```bash
+$ redis-cli 
+$ ping
+```
+
+4. Roda `npm run start:local`
+5. (Opcional) Abre uma nova aba no terminal e roda `npm run tunnel` para expor sua API local.
 
 ### Uso com Docker
+Para desenvolvimento e testes do sistema Iris como um todo. No docker-compose (do projeto pai) todos os componentes da infraestrutura estão definidos, incluindo o ngrok.
+1. Instale as dependências.
+2. Crie o arquivo .env.development e cria as chaves com seus valores seguindo o .env.example.
+3. Confere as chaves .env do projeto Iris
+4. Roda: `docker compose up -d`
+
 Para executar o aplicativo usando o Docker, você pode criar a imagem Docker usando o arquivo `Dockerfile` fornecido e, em seguida, executar um contêiner baseado nessa imagem.
 
-```
-# Crie a imagem Docker
-docker build -t express-app .
-
-# Execute um contêiner com base na imagem
-docker run -p 3000:3000 express-app
-```
+## Estrutura de Pastas
 
 ## Pendencias/bugs
 - Testes unitários
-- Automação de fluxos e logs GDPR
-- Deletar loja do conjunto de lojas do usuário no webhook `/shop/redact`, mesmo sem receber `req.session.userId`
-- Fluxo de oAuth da shopify quando o app é instalado a partir da Shopify App Store
+- Subscrição de wehooks obrigátorios da Shopify
