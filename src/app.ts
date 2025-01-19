@@ -5,9 +5,10 @@ import passport from 'passport';
 import http, { Server } from 'http';
 import Socket from './sockets/index';
 import ResourceController from "./controllers/resource";
-import RedisService from './clients/redis';
+import RedisService from './services/redis';
 import { errorHandler } from './middleware/auth';
 import logger from './utils/logger';
+import { AppConfiguration } from "./ts/interfaces/app";
 
 
 export default class App {
@@ -18,7 +19,7 @@ export default class App {
 	public socket: Socket;
 	public controllers: ResourceController[];
 
-	constructor(controllers: ResourceController[], configuration: any) {
+	constructor(controllers: ResourceController[], configuration: AppConfiguration) {
 		this.app = express();
 		this.port = configuration.port;
 		this.environment = configuration.environment;
@@ -60,7 +61,7 @@ export default class App {
 
 	private initializeControllers(controllers: ResourceController[]) {
 		controllers.forEach((controller) => {
-			logger.info(`Registering controller for resource: ${controller.path}`);
+			logger.info(`Registering controller for resource: ${controller.constructor.name} at ${controller.path}`);
 			this.app.use(controller.path, controller.router);
 		});
 	}

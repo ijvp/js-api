@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import ResourceController from './resource';
 import logger from '../utils/logger';
 
-class DefaultController extends ResourceController {
+export default class DefaultController extends ResourceController {
     constructor() {
         super('/');
         this.initializeRoutes();
@@ -22,5 +22,3 @@ class DefaultController extends ResourceController {
         res.redirect('/auth/me');
     }
 }
-
-export default DefaultController;

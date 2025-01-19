@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import logger from '../utils/logger';
 import ResourceController from './resource';
 import { auth } from '../middleware/auth';
 import { logIn } from '../utils/session';
 import { verifyHMAC } from '../middleware/shopify';
-import ShopifyService from '../clients/shopify';
+import ShopifyService from '../services/shopify';
 import { Session } from '@shopify/shopify-api';
 
 
@@ -21,22 +21,10 @@ export default class ShopController extends ResourceController {
 	//session can use userId to get shopify_sessions:<userId>
 	initializeRoutes(): void {
 		this.router.get('/login', this.loginToShop.bind(this));
-		this.router.get('/auth', this.shopifyService.getAuthMiddleware().begin());
-		this.router.get('/auth/callback',
-			verifyHMAC,
-			this.shopifyService.getAuthMiddleware().callback(),
-			(req, res, next) => {
-				if (req.query.shop) {
-					logIn(req, req.query.shop.toString());
-					//TODO: redirect /auth/login ?
-				} else {
-					next(new Error('Missing shop parameter'));
-				}
-				next();
-			},
-			this.shopifyService.redirectOnAuthCompletion()
-		);
-		this.router.get('/orders', auth, this.shopifyService.validateAuthenticatedSession(), this.getOrders.bind(this));
+		this.router.get('/auth', this.shopifyService.beginAuth());
+		this.router.get('/auth/callback', verifyHMAC, this.shopifyService.authCallback(), this.loginToApp.bind(this), this.shopifyService.redirectOnAuthCompletion());
+		this.router.get('/orders', auth, this.shopifyService.validateSession(), this.getOrders.bind(this));
+		this.router.post('/webhooks', verifyHMAC, this.shopifyService.processWebhooks());
 	}
 
 	loginToShop(req: Request, res: Response) {
@@ -50,12 +38,20 @@ export default class ShopController extends ResourceController {
 		res.redirect(storeLoginURL);
 	}
 
+	loginToApp(req: Request, res: Response, next: NextFunction) {
+		if (req.query.shop) {
+			logIn(req, req.query.shop.toString());
+		} else {
+			next(new Error('Missing shop parameter'));
+		}
+		next();
+	}
+
 	async getOrders(req: Request, res: Response) {
 		const session: Session = res.locals.shopify.session;
 		const data = await this.shopifyService.getLastTenOrders(session);
 		res.status(200).json(data);
 	};
-
 
 	// async createStore(store) {
 	// 	try {
@@ -666,4 +662,4 @@ export default class ShopController extends ResourceController {
 	// 	//TODO:
 	// };
 	// //END WEBHOOKS
-};
+}

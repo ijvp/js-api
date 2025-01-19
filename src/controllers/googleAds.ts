@@ -1,13 +1,167 @@
+import { Request, Response } from 'express';
+import ResourceController from "./resource";
+import logger from "../utils/logger";
 // const { GoogleAdsApi } = require('google-ads-api');
 // const { google } = require('googleapis');
 // const logger = require('../utils/logger');
 // const { formatGoogleDateRange } = require('../utils/date');
 
-// const googleAds = new GoogleAdsApi({
-// 	client_id: `${process.env.GOOGLE_CLIENT_ID}`,
-// 	client_secret: `${process.env.GOOGLE_CLIENT_SECRET}`,
-// 	developer_token: `${process.env.GOOGLE_MANAGE_TOKEN}`,
-// });
+
+
+export default class GoogleAdsController extends ResourceController {
+    // const googleAds = new GoogleAdsApi({
+    // 	client_id: `${process.env.GOOGLE_CLIENT_ID}`,
+    // 	client_secret: `${process.env.GOOGLE_CLIENT_SECRET}`,
+    // 	developer_token: `${process.env.GOOGLE_MANAGE_TOKEN}`,
+    // });
+    constructor() {
+        super('/google-ads');
+        this.initializeRoutes();
+    }
+
+    initializeRoutes(): void {
+        this.router.get('/supported-apis', this.getSupportedAPIs);
+        this.router.get('/auth', this.login.bind(this));
+        this.router.get('/auth/callback', this.callback.bind(this));
+        this.router.get('/accounts', this.getAccounts.bind(this));
+        this.router.post('/account/connect', this.connectAccount.bind(this));
+        this.router.get('/account/disconnect', this.disconnectAccount.bind(this));
+        this.router.post('/ad-expenses', this.getAdExpenses.bind(this));
+    }
+
+    getSupportedAPIs(req: Request, res: Response): void {
+        //   const apis = google.getSupportedAPIs();
+        //   return res.json(apis);
+    }
+
+    login(req: Request, res: Response): void {
+        //   const { store, service } = req.query;
+
+        //   if (!store) {
+        //     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
+        //   }
+
+        //   oauth2Client = new google.auth.OAuth2(
+        //     `${GOOGLE_CLIENT_ID}`,
+        //     `${GOOGLE_CLIENT_SECRET}`,
+        //     `${process.env.URL}/${service}/callback`
+        //   );
+
+        //   let redirect = oauth2Client.generateAuthUrl({
+        //     access_type: 'offline',
+        //     prompt: 'consent',
+        //     scope: [
+        //       GOOGLE_SCOPES[service]
+        //     ],
+        //     state: store,
+        //     include_granted_scopes: true
+        //   });
+
+        //   return res.status(200).json(redirect);
+    }
+
+    callback(req: Request, res: Response): void {
+        //   const { code, state: shop } = req.query;
+
+        //   oauth2Client.getToken(code, async (error, token) => {
+        //     if (error) {
+        //       return res.status(500).json({ success: false, error });
+        //     };
+
+        //     try {
+        //       await googleController.grantGoogleAdsAccessToStore(shop, token);
+        //       return res.redirect(`${process.env.FRONTEND_URL}/integracoes?platform=google-ads&store=${shop}`);
+        //     } catch (error) {
+        //       logger.error(error);
+        //       return res.status(500).json({ success: false, message: "Internal Server Error" })
+        //     }
+        //   });
+    }
+
+    getAccounts(req: Request, res: Response): void {
+        //   try {
+        //     const { store } = req.query;
+        //     const accounts = await googleController.fetchGoogleAdsAccountList(store);
+        //     res.status(200).json(accounts);
+        //   } catch (error) {
+        //     res.status(500).json({ success: false, message: 'Internal server error' });
+        //   }
+    }
+
+    connectAccount(req: Request, res: Response): void {
+        //   try {
+        //     const { store, account } = req.body;
+        //     await googleController.storeGoogleAdsAccount({ store, ...account });
+        //     res.status(200).json({ success: true, message: 'Account connected' });
+        //   } catch (error) {
+        //     res.status(500).json({ success: false, message: 'Internal server error' });
+        //   }
+
+        //OR
+
+        //   const { account, store } = req.body;
+        //   if (!(account)) {
+        //     return res.status(400).send({ success: false, message: 'Invalid request body' });
+        //   }
+
+        //   try {
+        //     await googleController.storeGoogleAdsAccount({ ...account, storeId: store });
+        //     return res.status(201).json({
+        //       success: true, message: `Google Ads account ${account.name} added to ${store}`
+        //     });
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, error: 'Internal server error' });
+        //   }
+    }
+
+    disconnectAccount(req: Request, res: Response): void {
+        //   try {
+        //     const { store } = req.query;
+        //     await googleController.deleteGoogleAdsAcccount(store);
+        //     return res.status(201).json({
+        //       success: true, message: `Google Ads account disconnected from '${store}'`
+        //     });
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, error: 'Internal server error' });
+        //   };
+    }
+
+    getAdExpenses(req: Request, res: Response): void {
+        //   const { start, end, store, granularity } = req.body;
+
+        //   if (!start && !end) {
+        //     return res.status(400).send('Start date and end date must be set');
+        //   };
+
+        //   const difference = differenceInDays(new Date(), new Date(start))
+
+        //   const isEndToday = differenceInDays(new Date(end), endOfToday()) === 0
+        //   const isYESTERDAY = differenceInDays(new Date(end), startOfToday()) === 0
+        //   const isTodayOrYESTERDAY = isEndToday || isYESTERDAY
+
+        //   let dateRange = getTimePeriodString({ difference, isTodayOrYESTERDAY })
+
+        //   try {
+        //     const response = await axios.post(`${process.env.PYEND_URL}/google-ads/ads`, {
+        //       store: store,
+        //       start,
+        //       end,
+        //       dateRange
+        //     })
+
+        //     // tem que reordenar aqui por algum motivo, mesmo o python devolvendo em ordem...
+        //     return res.status(200).send({
+        //       ...response.data, metricsBreakdown: response.data.metricsBreakdown.sort((a, b) => {
+        //         return new Date(a.date) - new Date(b.date);
+        //       })
+        //     });
+
+        //   } catch (error) {
+        //     logger.error(error);
+        //     return res.status(500).json({ success: false, message: 'Internal server error' });
+        //   };
+    }
+}
 
 // const googleAnalytics = google.analyticsreporting('v4');
 
@@ -289,5 +443,3 @@
 // 		}
 // 	};
 // };
-
-// module.exports = GoogleController;

@@ -1,3 +1,198 @@
+import { Request, Response } from 'express';
+import ResourceController from "./resource";
+
+
+export default class FacebookController extends ResourceController {
+    constructor() {
+        super('/facebook');
+        this.initializeRoutes();
+    }
+
+    initializeRoutes(): void {
+        this.router.get('/auth', this.login.bind(this));
+        this.router.get('/auth/callback', this.callback.bind(this));
+        this.router.get('/accounts', this.getAccounts.bind(this));
+        this.router.post('/account/connect', this.connectAccount.bind(this));
+        this.router.get('/account/disconnect', this.disconnectAccount.bind(this));
+        this.router.post('/campaigns', this.getCampaigns.bind(this));
+        this.router.post('/ad-sets', this.getAdSets.bind(this));
+        this.router.post('/ad-expenses', this.getAdExpenses.bind(this));
+        this.router.post('/ad-insights', this.getAdInsights.bind(this));
+    }
+
+    login(req: Request, res: Response) {
+        //   const { store } = req.query;
+
+        //   if (!store) {
+        //     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' });
+        //   }
+
+        //   return res.status(200).json(`https://www.facebook.com/${process.env.FACEBOOK_API_VERSION}/dialog/oauth?client_id=${process.env.FACEBOOK_API_CLIENT_ID}&redirect_uri=${process.env.FACEBOOK_API_REDIRECT_URL}&scope=${process.env.FACEBOOK_API_SCOPES}&state=${store}`);
+    }
+
+    callback(req: Request, res: Response) {
+        //   const { code, state: shop } = req.query;
+
+        //   try {
+        //     const response = await axios.get(`https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/oauth/access_token`, {
+        //       params: {
+        //         redirect_uri: process.env.FACEBOOK_API_REDIRECT_URL,
+        //         client_id: process.env.FACEBOOK_API_CLIENT_ID,
+        //         client_secret: process.env.FACEBOOK_API_CLIENT_SECRET,
+        //         code
+        //       }
+        //     });
+
+        //     const clientId = await axios.get(`https://graph.facebook.com/${process.env.FACEBOOK_API_GRAPH_VERSION}/me`, {
+        //       params: {
+        //         fields: 'id',
+        //         access_token: response.data.access_token
+        //       }
+        //     }).then(response => response.data.id);
+
+        //     await facebookController.grantFacebookAccessToStore(shop, response.data.access_token);
+        //     return res.redirect(`${process.env.FRONTEND_URL}/integracoes?platform=facebook&store=${shop}`);
+        //   } catch (error) {
+        //     logger.error(error);
+        //     return res.status(500).json({ success: false, message: "Internal Server Error" });
+        //   }
+    }
+
+    getAccounts(req: Request, res: Response) {
+        //   try {
+        //     const { store } = req.query;
+        //     const accounts = await facebookController.fetchFacebookAccountList(store);
+        //     return res.status(200).json(accounts);
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, message: 'Internal server error' });
+        //   }
+    }
+
+    connectAccount(req: Request, res: Response) {
+        //   const { account, store } = req.body;
+        //   if (!account) {
+        //     return res.status(400).json({ success: false, message: 'Invalid request body' });
+        //   }
+
+        //   try {
+        //     await facebookController.createFacebookAdsAccount({ ...account, storeId: store });
+        //     return res.status(201).json({
+        //       success: true, message: `Facebook Ads account ${account.name} added to ${store}`
+        //     });
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, error: 'Internal server error' });
+        //   }
+    }
+
+    disconnectAccount(req: Request, res: Response) {
+        //   try {
+        //     const { store } = req.query;
+        //     await facebookController.deleteFacebookAdsAccount(store);
+        //     return res.status(201).json({
+        //       success: true, message: `Facebook Ads account disconnected from '${store}'`
+        //     });
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, error: 'Internal server error' });
+        //   }
+    }
+
+    getCampaigns(req: Request, res: Response) {
+        //   try {
+        //     const { store } = req.body;
+        //   if (!store) {
+        //     return res.status(400).json({ success: false, message: 'Invalid request body' });
+        //   }
+        //     const campaigns = await facebookController.fetchActiveFacebookCampaigns(store);
+        //     return res.status(200).json(campaigns);
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, message: 'Internal server error' });
+        //   }
+    }
+
+    getAdSets(req: Request, res: Response) {
+        //   try {
+        //     const { store, campaign } = req.body;
+        //     if (!store || !campaign) {
+        //       return res.status(400).json({ success: false, message: 'Invalid request body' });
+        //     }
+        //     const adSets = await facebookController.fetchFacebookCampaignAdSets(store, campaign);
+        //     return res.status(200).json(adSets);
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, message: 'Internal server error' });
+        //   }
+
+        //OR
+
+        //   const { store } = req.body;
+
+        //   if (!store) {
+        //     return res.status(400).json({ success: false, message: 'Invalid request body' });
+        //   }
+
+        //   try {
+        //     const adSets = [];
+        //     const { data: campaigns } = await facebookController.fetchActiveFacebookCampaigns(store);
+
+        //     const adSetsPromises = campaigns.map(async campaign => {
+        //       const campaignAdSets = await facebookController.fetchFacebookCampaignAdSets(store, campaign.id);
+        //       return { campaignId: campaign.id, campaignName: campaign.name, adSets: campaignAdSets.data };
+        //     });
+
+        //     adSets.push(...await Promise.all(adSetsPromises));
+
+        //     return res.json(adSets);
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, error: "Internal server error" });
+        //   }
+    }
+
+    getAdExpenses(req: Request, res: Response) {
+        //   const { store, start, end, granularity } = req.body;
+
+        //   if (!store || !start || !end) {
+        //     return res.status(400).json({ success: false, message: 'Invalid request body' });
+        //   }
+
+        //   try {
+        //     const adsMetrics = {};
+        //     const timeRange = { since: start, until: end };
+        //     const { allAdsMetrics: allAdsExpenses, ttl } = await facebookController.fetchFacebookAdsExpenses(store, timeRange);
+
+        //     allAdsExpenses.forEach(adsExpenses => {
+        //       adsExpenses.metricsBreakdown.forEach(metricBreakdown => {
+        //         const { date, metrics } = metricBreakdown;
+        //         if (date in adsMetrics) {
+        //           adsMetrics[date].spend = parseFloat((adsMetrics[date].spend + parseFloat(metrics.spend)).toFixed(2));
+        //         } else {
+        //           adsMetrics[date] = { spend: parseFloat(metrics.spend) };
+        //         }
+        //       });
+        //     });
+
+        //     return res.json({ id: 'facebook-ads.ads-metrics', metricsBreakdown: Object.entries(adsMetrics).map(([date, metrics]) => ({ date, metrics })), ttl });
+        //   } catch (error) {
+        //     return res.status(500).json({ success: false, error: "Internal server error" });
+        //   }
+    }
+
+    getAdInsights(req: Request, res: Response) {
+        //   const { store, adName, start, end } = req.body;
+
+        //   if (!store) {
+        //     return res.status(400).json({ success: false, message: 'Invalid request body' });
+        //   }
+
+        //   try {
+        //     const timeRange = { since: start, until: end };
+        //     const adInsights = await facebookController.fetchFacebookAdsInsights(store, adName, timeRange);
+        //     return res.json(adInsights);
+        //   } catch (error) {
+        //     logger.error(error);
+        //     return res.status(500).json({ success: false, error: "Internal server error" });
+        //   }
+    }
+}
+
 // const axios = require('axios');
 // const logger = require('../utils/logger');
 // const { differenceInDays, parseISO } = require('date-fns');

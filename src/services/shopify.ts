@@ -1,5 +1,5 @@
-import { ApiVersion, GraphqlClient, Session } from '@shopify/shopify-api';
-import { ShopifyApp, shopifyApp } from '@shopify/shopify-app-express';
+import { ApiVersion, DeliveryMethod, GraphqlClient, Session } from '@shopify/shopify-api';
+import { ShopifyApp, shopifyApp, WebhookHandlersParam } from '@shopify/shopify-app-express';
 import { RedisSessionStorage } from '@shopify/shopify-app-session-storage-redis';
 import logger from '../utils/logger';
 
@@ -41,6 +41,56 @@ export default class ShopifyService {
 		// this.graphqlClient = new this.shopify.api.clients.Graphql({ session });
 	};
 
+	public beginAuth() {
+		return this.shopify.auth.begin();
+	}
+
+	public authCallback() {
+		return this.shopify.auth.callback();
+	}
+
+	public redirectOnAuthCompletion() {
+		return this.shopify.redirectToShopifyOrAppRoot();
+	};
+
+	public validateSession() {
+		return this.shopify.validateAuthenticatedSession();
+	};
+
+	public processWebhooks() {
+		const webhookHandlers: WebhookHandlersParam = {
+			CUSTOMERS_DATA_REQUEST: {
+				deliveryMethod: DeliveryMethod.Http,
+				callbackUrl: this.shopify.config.webhooks.path,
+				callback: async (topic: any, shop: any, body: string, webhookId: any, apiVersion: any) => {
+					const payload = JSON.parse(body);
+					logger.info(`Processing webhook for shop ${shop.domain}: ${webhookId} ${topic}`);
+					// prepare customers data to send to customer
+				},
+			},
+			CUSTOMERS_REDACT: {
+				deliveryMethod: DeliveryMethod.Http,
+				callbackUrl: this.shopify.config.webhooks.path,
+				callback: async (topic: any, shop: any, body: string, webhookId: any, apiVersion: any) => {
+					const payload = JSON.parse(body);
+					logger.info(`Processing webhook for shop ${shop.domain}: ${webhookId} ${topic}`);
+					// remove customers data
+				},
+			},
+			SHOP_REDACT: {
+				deliveryMethod: DeliveryMethod.Http,
+				callbackUrl: this.shopify.config.webhooks.path,
+				callback: async (topic: any, shop: any, body: string, webhookId: any, apiVersion: any) => {
+					const payload = JSON.parse(body);
+					logger.info(`Processing webhook for shop ${shop.domain}: ${webhookId} ${topic}`);
+					// remove shop data
+				},
+			},
+		};
+
+		return this.shopify.processWebhooks({ webhookHandlers });
+	};
+
 	public async getLastTenOrders(session: Session) {
 		try {
 			if (!session) {
@@ -59,7 +109,7 @@ export default class ShopifyService {
 					}
 				}`
 			});
-			
+
 			if (response.body) {
 				return response.body.data;
 			}
@@ -68,17 +118,7 @@ export default class ShopifyService {
 		}
 	};
 
-	public getAuthMiddleware() {
-		return this.shopify.auth;
-	};
-
-	public redirectOnAuthCompletion() {
-		return this.shopify.redirectToShopifyOrAppRoot();
-	};
-
-	public validateAuthenticatedSession() {
-		return this.shopify.validateAuthenticatedSession();
-	};
+	//HELPERS
 
 	// public getOrders() {
 	// 	// Fetch orders from Shopify

@@ -1,10 +1,9 @@
-import express, { Request, Response, Router, NextFunction } from 'express';
+import { Request, Response } from 'express';
 import logger from '../utils/logger';
 import { logIn, logOut } from '../utils/session';
 import { encrypt, decrypt } from '../utils/crypto';
 import { User } from '../models/User';
 import { auth } from '../middleware/auth';
-import ShopController from './shop';
 import ResourceController from './resource';
 
 export default class AuthController extends ResourceController {

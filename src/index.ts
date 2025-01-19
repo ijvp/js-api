@@ -6,14 +6,13 @@ import logger from "./utils/logger";
 import DefaultController from "./controllers/default";
 import AuthController from "./controllers/auth";
 import ShopController from "./controllers/shop";
+import { AppConfiguration } from './ts/interfaces/app';
+import GoogleAdsController from './controllers/googleAds';
+import GoogleAnalyticsController from './controllers/googleAnalytics';
+import FacebookController from './controllers/facebook';
 
 
-interface AppConfig {
-    environment: string;
-    port: number;
-}
-
-const appConfig: AppConfig = {
+const appConfig: AppConfiguration = {
     environment: process.env.NODE_ENV || "development",
     port: parseInt(process.env.PORT || "8080")
 }
@@ -24,7 +23,10 @@ const app = new App(
     [
         new DefaultController(),
         new AuthController(),
-        new ShopController()
+        new ShopController(),
+        new GoogleAdsController(),
+        new GoogleAnalyticsController(),
+        new FacebookController()
     ],
     appConfig
 );
