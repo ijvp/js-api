@@ -18,6 +18,7 @@ export default class App {
 	public server: Server;
 	public socket: Socket;
 	public controllers: ResourceController[];
+	public cache: RedisService;
 
 	constructor(controllers: ResourceController[], configuration: AppConfiguration) {
 		this.app = express();
@@ -26,6 +27,7 @@ export default class App {
 		this.server = http.createServer(this.app);
 		this.socket = new Socket(this.server);
 		this.controllers = controllers;
+		this.cache = new RedisService();
 
 		this.initializeMiddlewares();
 		this.initializeControllers(controllers);
@@ -33,13 +35,36 @@ export default class App {
 	}
 
 	private initializeMiddlewares() {
-		// App encoding config
+		this.configureAppEncoding();
+		this.configureAppSessions();
+		this.configureCors();
+		this.configureProxy();
+	}
+
+	private initializeControllers(controllers: ResourceController[]) {
+		controllers.forEach((controller) => {
+			logger.info('Registering %s for resource %s\nPaths:\n%s',
+				controller.constructor.name,
+				controller.path,
+				controller.router.stack.map(r => ' -- ' + r.route!.path).join('\n')
+			);
+			this.app.use(controller.path, controller.router);
+		});
+	}
+
+	private initializeErrorHandling() {
+		this.app.use(errorHandler);
+	}
+
+	private configureAppEncoding() {
 		this.app.use(json());
 		this.app.use(urlencoded({ extended: true }));
+	}
 
-		// Redis session middleware
+	private configureAppSessions() {
+		logger.info('Configuring app sessions using %s store', Object(this.cache).constructor.name);
 		this.app.use(session({
-			store: new RedisService().redisStore,
+			store: this.cache.getRedisStore(),
 			secret: process.env.SESSION_SECRET || 'default_secret',
 			resave: false,
 			saveUninitialized: false,
@@ -55,27 +80,46 @@ export default class App {
 		this.app.use(passport.session());
 	}
 
-	private initializeErrorHandling() {
-		this.app.use(errorHandler);
+	private configureCors() {
+		// CORS middleware
+		// const whitelist = [
+		// 	process.env.FRONTEND_URL
+		// ];
+
+		// const corsOptions: cors.CorsOptions = {
+		// 	credentials: true,
+		// 	origin: function (origin, callback) {
+		// 		//TODO: test this line and other corsOption.req middleware
+		// 		//Postman bypass for local development since it has no origin
+		// 		if (!origin) {
+		// 			callback(null, true);
+		// 		}
+		// 		else if (whitelist.indexOf(origin) !== -1) {
+		// 			callback(null, true)
+		// 		} else {
+		// 			callback(new Error(`Not allowed by CORS: ${origin}`))
+		// 		}
+		// 	}
+		// };
+
+		// app.use((req, res, next) => {
+		// 	corsOptions.req = req;
+		// 	next();
+		// });
 	}
 
-	private initializeControllers(controllers: ResourceController[]) {
-		controllers.forEach((controller) => {
-			logger.info(`Registering controller for resource: ${controller.constructor.name} at ${controller.path}`);
-			this.app.use(controller.path, controller.router);
-		});
+	private configureProxy() {
+		logger.info('Configuring proxy: nginx %s', this.environment === 'production' ? 'enabled' : 'disabled');
+		// Tell express to allow nginx address directly next to app
+		// which points to the aws production load balancer
+		if (this.environment === 'production') {
+			this.app.set('trust proxy', true);
+		}
 	}
-
-	// Tell express to allow nginx address directly next to app
-	// which points to the aws production load balancer
-	// if(process.env.NODE_ENV !== 'development') {
-	// 	logger.info(`Configuring nginx proxy for env:${process.env.NODE_ENV}`);
-	// 	app.set('trust proxy', true);
-	// }
 
 	public listen() {
 		this.app.listen(this.port, () => {
-			logger.info('App listening on port %d', this.port);
+			logger.info('App listening on port %s', this.port);
 			// connect();
 		});
 	}

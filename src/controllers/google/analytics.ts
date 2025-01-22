@@ -1,10 +1,17 @@
 import { Request, Response } from 'express';
 import ResourceController from "../resource";
+import GoogleService from '../../services/google';
+import logger from "../../utils/logger";
+
 
 export default class GoogleAnalyticsController extends ResourceController {
+    public readonly googleService: GoogleService;
+
     constructor() {
         super('/google-analytics');
         this.initializeRoutes();
+
+        this.googleService = new GoogleService();
     }
 
     initializeRoutes() {
@@ -18,6 +25,8 @@ export default class GoogleAnalyticsController extends ResourceController {
     }
 
     login(req: Request, res: Response): void {
+        const redirectUrl: string = this.googleService.generateApiAuthUrl('google-analytics');
+        res.redirect(redirectUrl);
         //   const { store, service } = req.query;
 
         //   if (!store) {
@@ -43,7 +52,18 @@ export default class GoogleAnalyticsController extends ResourceController {
         //   return res.status(200).json(redirect);
     }
 
-    callback(req: Request, res: Response): void {
+    async callback(req: Request, res: Response): Promise<void> {
+        const { code, state: shop } = req.query;
+
+        await this.googleService.getAuthToken(code!.toString(), 'google-analytics')
+            .then(async (token) => {
+                logger.info(`Token: ${token}`);
+                res.json({ success: true, message: "Token received" });
+            })
+            .catch((error) => {
+                logger.error(error);
+                res.status(500).json({ success: false, message: "Internal Server Error" });
+            });
         //   const { code, state: shop } = req.query;
 
         //   oauth2Client.getToken(code, async (error, token) => {

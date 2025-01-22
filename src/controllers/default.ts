@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import ResourceController from './resource';
 import logger from '../utils/logger';
 
+
 export default class DefaultController extends ResourceController {
     constructor() {
         super('/');
@@ -14,7 +15,7 @@ export default class DefaultController extends ResourceController {
     }
 
     private ping(req: Request, res: Response) {
-        logger.info("Pong!");
+        logger.info("Get pinged bitch");
         res.json('pong');
     }
 

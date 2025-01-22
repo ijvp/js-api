@@ -18,6 +18,9 @@ const appConfig: AppConfiguration = {
 }
 
 logger.info('Starting app in %s mode', appConfig.environment);
+if (appConfig.environment === 'local') {
+    logger.warn('Running locally: Make sure you have a local Redis server running and that your tunnel is online.');
+}
 
 const app = new App(
     [

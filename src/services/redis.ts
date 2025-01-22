@@ -2,10 +2,11 @@ import { Redis, Cluster, ClusterNode, ClusterOptions } from "ioredis";
 import logger from "../utils/logger";
 import RedisStore from "connect-redis";
 
+
 export default class RedisService {
-	public readonly redisClient: Redis;
-	public readonly redisStore: RedisStore;
-	
+	private readonly redisClient: Redis;
+	private readonly redisStore: RedisStore;
+
 	public readonly clusterOptions: ClusterOptions = {
 		enableReadyCheck: true,
 		redisOptions: {
@@ -14,7 +15,7 @@ export default class RedisService {
 				checkServerIdentity: (servername, cert) => { return undefined }
 			}
 		}
-		
+
 	}
 
 	constructor() {
@@ -47,6 +48,14 @@ export default class RedisService {
 		this.redisClient.on('ready', () => logger.info('Redis client is ready'));
 		this.redisClient.on('message', (msg) => logger.info('%s: %s', this.constructor.name, msg));
 		this.redisClient.on('error', (error) => logger.error('%s: %s', this.constructor.name, error));
+	}
+
+	public getRedisClient(): Redis {
+		return this.redisClient;
+	}
+
+	public getRedisStore(): RedisStore {
+		return this.redisStore;
 	}
 }
 // const Redis = require('ioredis');

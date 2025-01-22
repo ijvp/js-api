@@ -1,12 +1,7 @@
 import { Request, Response } from 'express';
 import ResourceController from "../resource";
-import logger from "../../utils/logger";
 import GoogleService from '../../services/google';
-// const { GoogleAdsApi } = require('google-ads-api');
-// const { google } = require('googleapis');
-// const logger = require('../utils/logger');
-// const { formatGoogleDateRange } = require('../utils/date');
-
+import logger from "../../utils/logger";
 
 
 export default class GoogleAdsController extends ResourceController {
@@ -41,36 +36,23 @@ export default class GoogleAdsController extends ResourceController {
     }
 
     login(req: Request, res: Response): void {
-        // const redirectUrl: string = this.googleService.generateApiAuthUrl('google-ads');
-        // res.redirect(redirectUrl);
-
-        //   const { store, service } = req.query;
-
-        //   if (!store) {
-        //     return res.status(400).json({ success: false, message: 'Invalid request query, missing store' })
-        //   }
-
-        //   oauth2Client = new google.auth.OAuth2(
-        //     `${GOOGLE_CLIENT_ID}`,
-        //     `${GOOGLE_CLIENT_SECRET}`,
-        //     `${process.env.URL}/${service}/callback`
-        //   );
-
-        //   let redirect = oauth2Client.generateAuthUrl({
-        //     access_type: 'offline',
-        //     prompt: 'consent',
-        //     scope: [
-        //       GOOGLE_SCOPES[service]
-        //     ],
-        //     state: store,
-        //     include_granted_scopes: true
-        //   });
-
-        //   return res.status(200).json(redirect);
+        const redirectUrl: string = this.googleService.generateApiAuthUrl('google-ads');
+        res.redirect(redirectUrl);
     }
 
-    callback(req: Request, res: Response): void {
-        //   const { code, state: shop } = req.query;
+    async callback(req: Request, res: Response): Promise<void> {
+        const { code, state: shop } = req.query;
+
+        await this.googleService.getAuthToken(code!.toString(), 'google-ads')
+            .then(async (token) => {
+                logger.info(`Token: ${token}`);
+                res.json({ success: true, message: "Token received" });
+            })
+            .catch((error) => {
+                logger.error(error);
+                res.status(500).json({ success: false, message: "Internal Server Error" });
+            });
+
 
         //   oauth2Client.getToken(code, async (error, token) => {
         //     if (error) {

@@ -32,6 +32,7 @@ interface CustomError extends Error {
 	message: string;
 }
 
+//TODO: refactor this to some global directory
 export const errorHandler = (error: CustomError, req: Request, res: Response, next: NextFunction) => {
 	error.statusCode = error.statusCode || 500;
 	error.status = error.status || "error";
