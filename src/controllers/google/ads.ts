@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import ResourceController from "./resource";
-import logger from "../utils/logger";
+import ResourceController from "../resource";
+import logger from "../../utils/logger";
+import GoogleService from '../../services/google';
 // const { GoogleAdsApi } = require('google-ads-api');
 // const { google } = require('googleapis');
 // const logger = require('../utils/logger');
@@ -9,18 +10,23 @@ import logger from "../utils/logger";
 
 
 export default class GoogleAdsController extends ResourceController {
+    public readonly googleService: GoogleService;
+
     // const googleAds = new GoogleAdsApi({
     // 	client_id: `${process.env.GOOGLE_CLIENT_ID}`,
     // 	client_secret: `${process.env.GOOGLE_CLIENT_SECRET}`,
     // 	developer_token: `${process.env.GOOGLE_MANAGE_TOKEN}`,
     // });
+
     constructor() {
         super('/google-ads');
         this.initializeRoutes();
+
+        this.googleService = new GoogleService();
     }
 
     initializeRoutes(): void {
-        this.router.get('/supported-apis', this.getSupportedAPIs);
+        this.router.get('/supported-apis', this.getSupportedAPIs.bind(this));
         this.router.get('/auth', this.login.bind(this));
         this.router.get('/auth/callback', this.callback.bind(this));
         this.router.get('/accounts', this.getAccounts.bind(this));
@@ -30,11 +36,14 @@ export default class GoogleAdsController extends ResourceController {
     }
 
     getSupportedAPIs(req: Request, res: Response): void {
-        //   const apis = google.getSupportedAPIs();
-        //   return res.json(apis);
+        const apis = this.googleService.getSupportedAPIs();
+        res.json(apis);
     }
 
     login(req: Request, res: Response): void {
+        // const redirectUrl: string = this.googleService.generateApiAuthUrl('google-ads');
+        // res.redirect(redirectUrl);
+
         //   const { store, service } = req.query;
 
         //   if (!store) {

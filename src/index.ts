@@ -7,8 +7,8 @@ import DefaultController from "./controllers/default";
 import AuthController from "./controllers/auth";
 import ShopController from "./controllers/shop";
 import { AppConfiguration } from './ts/interfaces/app';
-import GoogleAdsController from './controllers/googleAds';
-import GoogleAnalyticsController from './controllers/googleAnalytics';
+import GoogleAdsController from './controllers/google/ads';
+import GoogleAnalyticsController from './controllers/google/analytics';
 import FacebookController from './controllers/facebook';
 
 

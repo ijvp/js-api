@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import ResourceController from "./resource";
+import ResourceController from "../resource";
 
 export default class GoogleAnalyticsController extends ResourceController {
     constructor() {
